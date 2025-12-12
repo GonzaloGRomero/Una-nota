@@ -42,6 +42,7 @@ youtube_oauth_tokens: Dict[str, Credentials] = {}
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/youtube/callback")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
@@ -50,6 +51,8 @@ class Track(BaseModel):
     id: str
     title: str
     url: str
+    artist: Optional[str] = None
+    video_id: Optional[str] = None  # Para carga bajo demanda de YouTube
 
 
 class Player(BaseModel):
@@ -1080,9 +1083,9 @@ async def youtube_callback(code: str, state: Optional[str] = None):
         youtube_oauth_tokens[session_id] = credentials
         
         # Redirigir al frontend con éxito
-        return RedirectResponse(url=f"http://localhost:3000/?youtube_auth=success")
+        return RedirectResponse(url=f"{FRONTEND_URL}/?youtube_auth=success")
     except Exception as e:
-        return RedirectResponse(url=f"http://localhost:3000/?youtube_auth=error&message={str(e)}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/?youtube_auth=error&message={str(e)}")
 
 
 @app.get("/auth/youtube/status")
@@ -1115,13 +1118,150 @@ def get_youtube_service():
         if credentials.valid:
             return build('youtube', 'v3', credentials=credentials)
         else:
-            # Intentar refrescar el token
             try:
                 credentials.refresh(Request())
                 return build('youtube', 'v3', credentials=credentials)
             except:
                 del youtube_oauth_tokens[session_id]
     return None
+
+
+def import_youtube_playlist_authenticated(playlist_id: str) -> tuple[List[Track], str]:
+    """Importa una playlist de YouTube usando la API autenticada (sin delays, sin detección de bots)"""
+    youtube = get_youtube_service()
+    if not youtube:
+        raise HTTPException(status_code=401, detail="No autenticado con YouTube. Inicia sesión primero.")
+    
+    try:
+        playlist_response = youtube.playlists().list(
+            part="snippet",
+            id=playlist_id
+        ).execute()
+        
+        if not playlist_response.get('items'):
+            raise HTTPException(status_code=404, detail="Playlist no encontrada o es privada")
+        
+        playlist_name = playlist_response['items'][0]['snippet']['title']
+        
+        tracks = []
+        next_page_token = None
+        
+        while True:
+            playlist_items = youtube.playlistItems().list(
+                part="snippet,contentDetails",
+                playlistId=playlist_id,
+                maxResults=50,
+                pageToken=next_page_token
+            ).execute()
+            
+            for item in playlist_items.get('items', []):
+                snippet = item.get('snippet', {})
+                video_id = snippet.get('resourceId', {}).get('videoId')
+                
+                if not video_id:
+                    continue
+                
+                title = snippet.get('title', 'Sin título')
+                channel = snippet.get('videoOwnerChannelTitle', '')
+                
+                if title in ['Deleted video', 'Private video']:
+                    continue
+                
+                if ' - ' in title:
+                    parts = title.split(' - ', 1)
+                    artist = parts[0].strip()
+                    song_title = parts[1].strip()
+                else:
+                    song_title = title
+                    artist = channel.replace(' - Topic', '') if channel else 'Artista desconocido'
+                
+                track = Track(
+                    id=f"yt_{video_id}",
+                    title=f"{song_title} - {artist}",
+                    url="",  # Se cargará bajo demanda
+                    artist=artist,
+                    video_id=video_id
+                )
+                tracks.append(track)
+            
+            next_page_token = playlist_items.get('nextPageToken')
+            if not next_page_token:
+                break
+        
+        return tracks, playlist_name
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error importando playlist: {str(e)}")
+
+
+@app.get("/youtube/audio/{video_id}")
+async def get_youtube_audio_url(video_id: str):
+    """Obtiene la URL de audio de un video de YouTube bajo demanda"""
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+        }
+        
+        cookies_path = get_youtube_cookies_path()
+        if cookies_path:
+            ydl_opts['cookiefile'] = cookies_path
+        
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            if info and info.get('url'):
+                return {"url": info['url'], "video_id": video_id}
+            
+            formats = info.get('formats', [])
+            audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+            if audio_formats:
+                best_audio = max(audio_formats, key=lambda x: x.get('abr', 0) or 0)
+                return {"url": best_audio['url'], "video_id": video_id}
+            
+            if formats:
+                return {"url": formats[-1].get('url', ''), "video_id": video_id}
+        
+        raise HTTPException(status_code=404, detail="No se pudo obtener el audio")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo audio: {str(e)}")
+
+
+@app.post("/playlist/import-authenticated")
+async def import_playlist_authenticated(data: PlaylistImport):
+    """Importa una playlist de YouTube usando la API autenticada (rápido, sin detección de bots)"""
+    global TRACKS, room
+    
+    playlist_id = extract_youtube_playlist_id(data.playlist_url)
+    if not playlist_id:
+        raise HTTPException(
+            status_code=400,
+            detail="URL de playlist de YouTube inválida"
+        )
+    
+    tracks, playlist_name = import_youtube_playlist_authenticated(playlist_id)
+    
+    if not tracks:
+        raise HTTPException(status_code=400, detail="La playlist está vacía o no tiene videos disponibles")
+    
+    TRACKS = tracks
+    room = Room(tracks)
+    
+    return {
+        "success": True,
+        "message": f"Playlist '{playlist_name}' importada. {len(tracks)} canciones cargadas.",
+        "tracks": [t.model_dump() for t in tracks],
+        "playlist_name": playlist_name,
+        "total_tracks": len(tracks),
+        "requires_audio_fetch": True  # Indica que las URLs se cargan bajo demanda
+    }
 
 
 @app.get("/")

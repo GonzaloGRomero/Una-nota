@@ -1,0 +1,293 @@
+.player-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
+  
+  .player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+  
+  .player-header h1 {
+    margin: 0;
+    color: #333;
+  }
+  
+  .connection-status {
+    font-size: 14px;
+    padding: 8px 16px;
+    background: #f5f5f5;
+    border-radius: 4px;
+  }
+  
+  .join-form {
+    max-width: 400px;
+    margin: 100px auto;
+    text-align: center;
+  }
+  
+  .join-form h1 {
+    margin-bottom: 30px;
+    color: #333;
+  }
+  
+  .join-form input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+  }
+  
+  .join-form button {
+    width: 100%;
+    padding: 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  .join-form button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .game-info-section {
+    background: #e7f3ff;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  
+  .point-awarded-notification {
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  .point-awarded-notification.point-won {
+    background: #d4edda;
+    border: 2px solid #28a745;
+  }
+  
+  .point-awarded-notification.point-lost {
+    background: #f8d7da;
+    border: 2px solid #dc3545;
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .notification-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+  }
+  
+  .point-won .notification-title {
+    color: #155724;
+  }
+  
+  .point-lost .notification-title {
+    color: #721c24;
+  }
+  
+  .track-info-label {
+    font-size: 14px;
+    color: #666;
+    margin: 10px 0 5px 0;
+    font-style: italic;
+  }
+  
+  .track-name {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+    margin: 10px 0;
+  }
+  
+  .track-artist {
+    font-size: 16px;
+    color: #666;
+    margin: 5px 0 0 0;
+  }
+  
+  .game-info-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .error-message {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin: 10px 0;
+  }
+  
+  .error-message p {
+    margin: 0;
+    font-size: 14px;
+  }
+  
+  .current-track {
+    padding: 15px;
+    background: #fff;
+    border-radius: 4px;
+  }
+  
+  .current-track p {
+    margin: 8px 0;
+    color: #333;
+  }
+  
+  .buzz-section {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .buzz-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .buzz-button {
+    width: 100%;
+    max-width: 400px;
+    padding: 30px;
+    font-size: 32px;
+    font-weight: bold;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .buzz-button:hover:not(:disabled) {
+    background: #218838;
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .buzz-button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  
+  .buzz-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .buzz-button.buzzed {
+    background: #ffc107;
+    color: #333;
+  }
+  
+  .position-info {
+    margin-top: 20px;
+    font-size: 18px;
+    color: #333;
+  }
+  
+  .position-info strong {
+    font-size: 24px;
+    color: #007bff;
+  }
+  
+  .waiting-info {
+    margin-top: 15px;
+    color: #666;
+    font-style: italic;
+  }
+  
+  .my-score-section {
+    background: #fff3cd;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .my-score-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .score-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .score-value {
+    font-size: 64px;
+    font-weight: bold;
+    color: #007bff;
+  }
+  
+  .score-label {
+    font-size: 18px;
+    color: #666;
+  }
+  
+  .scoreboard-section {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+  }
+  
+  .scoreboard-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .scoreboard-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  
+  .scoreboard-section th,
+  .scoreboard-section td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .scoreboard-section th {
+    background: #333;
+    color: white;
+  }
+  
+  .scoreboard-section tr:hover {
+    background: #f5f5f5;
+  }
+  
+  .scoreboard-section .my-row {
+    background: #e7f3ff;
+    font-weight: bold;
+  }
+  
