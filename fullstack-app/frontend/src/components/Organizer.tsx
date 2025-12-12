@@ -501,22 +501,42 @@ export function Organizer() {
 
           {gameState.current_track_id && (() => {
             const currentTrack = gameState.tracks.find(t => t.id === gameState.current_track_id);
-            const isYouTubeTrack = currentTrack?.video_id;
-            
-            return isYouTubeTrack ? (
+            if (!currentTrack) return null;
+
+            // Extraer artista y nombre de canción
+            const titleParts = currentTrack.title.split(' - ');
+            const artist = currentTrack.artist || (titleParts.length > 1 ? titleParts[0] : '');
+            const songName = titleParts.length > 1 ? titleParts[1] : titleParts[0];
+
+            // Normalizar para URL (minúsculas, reemplazar espacios y caracteres especiales)
+            const normalizeForUrl = (text: string): string => {
+              return text
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+                .replace(/[^a-z0-9]+/g, '-') // Reemplazar caracteres especiales con guiones
+                .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y final
+            };
+
+            const artistSlug = normalizeForUrl(artist);
+            const songSlug = normalizeForUrl(songName);
+            const lyricsUrl = `https://www.letra.com/${artistSlug}/${songSlug}`;
+
+            return (
               <div className="lyrics-section">
-                <h2>Letra de la Canción (YouTube Music)</h2>
-                <div className="lyrics-iframe-container">
-                  <iframe
-                    src={`https://music.youtube.com/watch?v=${currentTrack.video_id}`}
-                    title="YouTube Music - Letra"
-                    className="lyrics-iframe"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                <h2>Letra de la Canción</h2>
+                <div className="lyrics-button-container">
+                  <a
+                    href={lyricsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="lyrics-button"
+                  >
+                    📝 Ver letra en Letra.com
+                  </a>
                 </div>
               </div>
-            ) : null;
+            );
           })()}
 
           <div className="buzzers-section">
