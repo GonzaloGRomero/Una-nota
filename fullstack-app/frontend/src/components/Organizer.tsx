@@ -504,12 +504,31 @@ export function Organizer() {
             if (!currentTrack) return null;
 
             // Extraer artista y nombre de canción
+            // El formato del título es: "Nombre de Canción - Artista"
+            // O puede tener el artista en el campo currentTrack.artist
             const titleParts = currentTrack.title.split(' - ');
-            const artist = currentTrack.artist || (titleParts.length > 1 ? titleParts[0] : '');
-            const songName = titleParts.length > 1 ? titleParts[1] : titleParts[0];
+            
+            let artist = '';
+            let songName = '';
+            
+            if (currentTrack.artist) {
+              // Si hay campo artist, usarlo directamente
+              artist = currentTrack.artist.trim();
+              // El nombre de la canción es la primera parte del título (antes del " - ")
+              songName = titleParts[0].trim();
+            } else if (titleParts.length > 1) {
+              // Si no hay campo artist pero hay separador, asumir formato "Canción - Artista"
+              songName = titleParts[0].trim();
+              artist = titleParts[1].trim();
+            } else {
+              // Si no hay separador ni campo artist, usar todo el título como canción
+              songName = titleParts[0].trim();
+              artist = '';
+            }
 
             // Normalizar para URL (minúsculas, reemplazar espacios y caracteres especiales)
             const normalizeForUrl = (text: string): string => {
+              if (!text) return '';
               return text
                 .toLowerCase()
                 .normalize('NFD')
@@ -520,7 +539,7 @@ export function Organizer() {
 
             const artistSlug = normalizeForUrl(artist);
             const songSlug = normalizeForUrl(songName);
-            const lyricsUrl = `https://www.letra.com/${artistSlug}/${songSlug}`;
+            const lyricsUrl = `https://www.letras.com/${artistSlug}/${songSlug}`;
 
             return (
               <div className="lyrics-section">
@@ -532,7 +551,7 @@ export function Organizer() {
                     rel="noopener noreferrer"
                     className="lyrics-button"
                   >
-                    📝 Ver letra en Letra.com
+                    📝 Ver letra en Letras.com
                   </a>
                 </div>
               </div>
