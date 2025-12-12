@@ -1,0 +1,596 @@
+.organizer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
+  
+  .organizer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+  
+  .organizer-header h1 {
+    margin: 0;
+    color: #333;
+  }
+  
+  .connection-status {
+    font-size: 14px;
+    padding: 8px 16px;
+    background: #f5f5f5;
+    border-radius: 4px;
+  }
+  
+  .join-form {
+    max-width: 400px;
+    margin: 100px auto;
+    text-align: center;
+  }
+  
+  .join-form input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+  }
+  
+  .join-form button {
+    width: 100%;
+    padding: 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  .join-form button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .playlist-import-section {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  
+  .playlist-import-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .playlist-source-selector {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+  }
+  
+  .playlist-source-selector label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+  }
+  
+  .playlist-source-selector input[type="radio"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+  }
+  
+  .playlist-import-section form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .playlist-import-section input {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .playlist-import-section button {
+    padding: 10px 20px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .playlist-import-section button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .error-message, .success-message {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+  
+  .error-message {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+  
+  .success-message {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+  
+  .error-message button, .success-message button {
+    margin-top: 10px;
+    padding: 5px 15px;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .tracks-section {
+    margin-bottom: 30px;
+  }
+  
+  .tracks-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .tracks-section h2 {
+    color: #333;
+    margin: 0;
+  }
+  
+  .shuffle-button {
+    padding: 8px 16px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+  }
+  
+  .shuffle-button:hover {
+    background: #5a6268;
+  }
+  
+  .tracks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+  }
+  
+  .track-card {
+    padding: 15px;
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+  }
+  
+  .track-card.active {
+    border-color: #007bff;
+    background: #e7f3ff;
+  }
+  
+  .track-title-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    min-height: 60px;
+    max-height: 80px;
+    overflow: hidden;
+  }
+  
+  .track-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.3;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 100%;
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+    word-wrap: break-word;
+  }
+  
+  .track-artist-container {
+    margin-bottom: 10px;
+    min-height: 40px;
+    max-height: 50px;
+    overflow: hidden;
+  }
+  
+  .track-artist {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+    line-height: 1.3;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 100%;
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+    word-wrap: break-word;
+  }
+  
+  .select-track-button {
+    width: 100%;
+    padding: 8px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  
+  .select-track-button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+  
+  .select-track-button:hover:not(:disabled) {
+    background: #218838;
+  }
+  
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 15px;
+  }
+  
+  .pagination-button {
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .pagination-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .pagination-button:hover:not(:disabled) {
+    background: #0056b3;
+  }
+  
+.pagination-info {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.youtube-auth-section {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.youtube-auth-section p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.auth-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-status.success {
+  color: #28a745;
+  font-weight: 500;
+  padding: 8px;
+  background: #d4edda;
+  border-radius: 4px;
+  border: 1px solid #c3e6cb;
+}
+
+.auth-status.warning {
+  color: #856404;
+  padding: 10px;
+  background: #fff3cd;
+  border-radius: 4px;
+  border: 1px solid #ffc107;
+}
+
+.auth-status.warning p {
+  margin: 0 0 10px 0;
+  color: #856404;
+}
+
+.loading-audio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 4px;
+  margin: 10px 0;
+  animation: pulse 1.5s infinite;
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.youtube-auth-button {
+  padding: 10px 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.youtube-auth-button:hover {
+  background: #c82333;
+}
+  
+  .controls-section {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  
+  .controls-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .controls-grid button {
+    padding: 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .controls-grid button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .current-track-info {
+    margin-top: 15px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 4px;
+  }
+  
+  .current-track-info p {
+    margin: 5px 0;
+    color: #333;
+  }
+  
+  .buzzers-section {
+    background: #fff3cd;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  
+  .buzzers-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .buzzers-section ol {
+    margin: 10px 0;
+    padding-left: 25px;
+  }
+  
+  .buzzers-section li {
+    margin: 8px 0;
+    font-size: 16px;
+    color: #333;
+  }
+  
+  .winner-section {
+    background: #d1ecf1;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  
+  .winner-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .winner-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .score-control-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  .score-control-row .player-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .score-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .score-button {
+    padding: 8px 16px;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    min-width: 50px;
+  }
+  
+  .score-button-plus {
+    background: #28a745;
+  }
+  
+  .score-button-plus:hover {
+    background: #218838;
+  }
+  
+  .score-button-minus {
+    background: #dc3545;
+  }
+  
+  .score-button-minus:hover {
+    background: #c82333;
+  }
+  
+  .winner-button {
+    padding: 12px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  .winner-button:hover {
+    background: #218838;
+  }
+  
+  .scores-section {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+  }
+  
+  .scores-section h2 {
+    margin-top: 0;
+    color: #333;
+  }
+  
+  .scores-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  
+  .scores-section th,
+  .scores-section td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .scores-section th {
+    background: #333;
+    color: white;
+  }
+  
+  .scores-section tr:hover {
+    background: #f5f5f5;
+  }
+  
+  .player-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  
+  .player-actions .score-button {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-width: 40px;
+  }
+  
+  .remove-player-button {
+    padding: 6px 12px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+  
+  .remove-player-button:hover {
+    background: #c82333;
+  }
+  
+  .no-tracks-message {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 18px;
+  }
