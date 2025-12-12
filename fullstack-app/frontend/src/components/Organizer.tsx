@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { Track, Player } from '../types';
 import './Organizer.css';
@@ -21,9 +21,6 @@ export function Organizer() {
   const [shuffledOrder, setShuffledOrder] = useState<string[]>([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [audioCache, setAudioCache] = useState<Record<string, string>>({});
-  const [currentLyrics, setCurrentLyrics] = useState<string | null>(null);
-  const [loadingLyrics, setLoadingLyrics] = useState(false);
-  const [lyricsCache, setLyricsCache] = useState<Record<string, string>>({});
   const tracksPerPage = 10;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -210,70 +207,6 @@ export function Organizer() {
     // Usar el endpoint de streaming que evita problemas de CORS y 403
     return `${API_BASE_URL}/youtube/stream/${videoId}`;
   };
-
-  const fetchLyrics = useCallback(async (trackName: string, artistName: string, track?: Track): Promise<string | null> => {
-    const cacheKey = `${trackName}_${artistName}`;
-    
-    // Verificar cache
-    if (lyricsCache[cacheKey]) {
-      return lyricsCache[cacheKey];
-    }
-    
-    // Si ya está en el track, usar esa
-    if (track?.lyrics) {
-      setLyricsCache(prev => ({ ...prev, [cacheKey]: track.lyrics! }));
-      return track.lyrics;
-    }
-    
-    try {
-      setLoadingLyrics(true);
-      const response = await fetch(
-        `${API_BASE_URL}/lyrics/${encodeURIComponent(trackName)}/${encodeURIComponent(artistName)}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (data.lyrics) {
-          setLyricsCache(prev => ({ ...prev, [cacheKey]: data.lyrics }));
-          return data.lyrics;
-        }
-      }
-    } catch {
-      // Error silencioso
-    } finally {
-      setLoadingLyrics(false);
-    }
-    return null;
-  }, [lyricsCache, API_BASE_URL]);
-
-  useEffect(() => {
-    if (!gameState || !gameState.current_track_id) {
-      setCurrentLyrics(null);
-      return;
-    }
-
-    const currentTrack = gameState.tracks.find(t => t.id === gameState.current_track_id);
-    if (!currentTrack) {
-      setCurrentLyrics(null);
-      return;
-    }
-
-    // Si ya tiene letras en el track, usarlas
-    if (currentTrack.lyrics) {
-      setCurrentLyrics(currentTrack.lyrics);
-      return;
-    }
-
-    // Extraer nombre de canción y artista del título
-    const titleParts = currentTrack.title.split(' - ');
-    const trackName = titleParts.length > 1 ? titleParts[1] : titleParts[0];
-    const artistName = currentTrack.artist || (titleParts.length > 1 ? titleParts[0] : '');
-
-    if (trackName && artistName) {
-      fetchLyrics(trackName, artistName, currentTrack).then(lyrics => {
-        setCurrentLyrics(lyrics);
-      });
-    }
-  }, [gameState?.current_track_id, gameState?.tracks, fetchLyrics]);
 
   const getShuffledTracks = (): Track[] => {
     if (!gameState) return [];
@@ -566,20 +499,25 @@ export function Organizer() {
             )}
           </div>
 
-          {gameState.current_track_id && (
-            <div className="lyrics-section">
-              <h2>Letra de la Canción</h2>
-              {loadingLyrics ? (
-                <div className="lyrics-loading">Cargando letra...</div>
-              ) : currentLyrics ? (
-                <div className="lyrics-content">
-                  <pre>{currentLyrics}</pre>
+          {gameState.current_track_id && (() => {
+            const currentTrack = gameState.tracks.find(t => t.id === gameState.current_track_id);
+            const isYouTubeTrack = currentTrack?.video_id;
+            
+            return isYouTubeTrack ? (
+              <div className="lyrics-section">
+                <h2>Letra de la Canción (YouTube Music)</h2>
+                <div className="lyrics-iframe-container">
+                  <iframe
+                    src={`https://music.youtube.com/watch?v=${currentTrack.video_id}`}
+                    title="YouTube Music - Letra"
+                    className="lyrics-iframe"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
                 </div>
-              ) : (
-                <div className="lyrics-empty">Letra no disponible</div>
-              )}
-            </div>
-          )}
+              </div>
+            ) : null;
+          })()}
 
           <div className="buzzers-section">
             <h2>Orden de Buzzers</h2>

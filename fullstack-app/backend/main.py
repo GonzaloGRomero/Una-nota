@@ -1347,69 +1347,6 @@ def get_youtube_audio_url_internal(video_id: str) -> Optional[str]:
         return None
 
 
-def get_lyrics(track_name: str, artist_name: str) -> Optional[str]:
-    """Obtiene la letra de una canción usando Musixmatch API (gratuita)"""
-    try:
-        # Musixmatch API pública (sin autenticación para búsquedas básicas)
-        # Nota: La API pública tiene límites, pero es suficiente para uso básico
-        search_url = "https://api.musixmatch.com/ws/1.1/track.search"
-        params = {
-            'q_track': track_name,
-            'q_artist': artist_name,
-            'page_size': 1,
-            'page': 1,
-            's_track_rating': 'desc',
-            'apikey': os.getenv('MUSIXMATCH_API_KEY', '')  # Opcional, funciona sin key pero con límites
-        }
-        
-        response = requests.get(search_url, params=params, timeout=10)
-        if response.status_code != 200:
-            return None
-        
-        data = response.json()
-        track_list = data.get('message', {}).get('body', {}).get('track_list', [])
-        
-        if not track_list:
-            return None
-        
-        track_id = track_list[0].get('track', {}).get('track_id')
-        if not track_id:
-            return None
-        
-        # Obtener letra
-        lyrics_url = f"https://api.musixmatch.com/ws/1.1/track.lyrics.get"
-        lyrics_params = {
-            'track_id': track_id,
-            'apikey': os.getenv('MUSIXMATCH_API_KEY', '')
-        }
-        
-        lyrics_response = requests.get(lyrics_url, params=lyrics_params, timeout=10)
-        if lyrics_response.status_code != 200:
-            return None
-        
-        lyrics_data = lyrics_response.json()
-        lyrics_body = lyrics_data.get('message', {}).get('body', {}).get('lyrics', {})
-        lyrics_text = lyrics_body.get('lyrics_body', '')
-        
-        # Musixmatch a veces devuelve "..." si la letra no está completa
-        if lyrics_text and lyrics_text.strip() and not lyrics_text.startswith('...'):
-            return lyrics_text
-        
-        return None
-    except Exception as e:
-        print(f"Error obteniendo letra: {e}")
-        return None
-
-
-@app.get("/lyrics/{track_name}/{artist_name}")
-async def get_track_lyrics(track_name: str, artist_name: str):
-    """Endpoint para obtener la letra de una canción"""
-    lyrics = get_lyrics(track_name, artist_name)
-    if lyrics:
-        return {"lyrics": lyrics, "track_name": track_name, "artist_name": artist_name}
-    return {"lyrics": None, "message": "Letra no encontrada"}
-
-
 @app.get("/youtube/audio/{video_id}")
 async def get_youtube_audio_url(video_id: str):
     """Obtiene la URL de audio de un video de YouTube bajo demanda (deprecated, usar /youtube/stream)"""

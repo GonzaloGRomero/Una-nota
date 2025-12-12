@@ -459,37 +459,19 @@
     margin-bottom: 15px;
   }
 
-  .lyrics-loading {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
-  }
-
-  .lyrics-empty {
-    text-align: center;
-    padding: 20px;
-    color: #999;
-    font-style: italic;
-  }
-
-  .lyrics-content {
-    background: #fff;
-    padding: 20px;
+  .lyrics-iframe-container {
+    width: 100%;
+    height: 600px;
     border-radius: 4px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    line-height: 1.6;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    font-size: 14px;
-    color: #333;
+    overflow: hidden;
+    background: #000;
   }
 
-  .lyrics-content pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-family: inherit;
+  .lyrics-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 4px;
   }
   
   .buzzers-section {
