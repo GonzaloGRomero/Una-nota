@@ -19,6 +19,7 @@ backend/*.pyc
 backend/.cache/
 backend/scores.json
 backend/youtube_cookies.txt
+backend/youtube_tokens.json
 backend/.env
 
 # Node

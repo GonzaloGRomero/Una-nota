@@ -38,6 +38,74 @@ app.add_middleware(
 # Almacenamiento de tokens OAuth2 (en memoria, por sesión)
 youtube_oauth_tokens: Dict[str, Credentials] = {}
 
+# Archivo para persistir tokens de YouTube
+YOUTUBE_TOKENS_FILE = Path(__file__).parent / "youtube_tokens.json"
+
+def save_youtube_tokens():
+    """Guarda los tokens de YouTube en un archivo JSON"""
+    try:
+        tokens_data = {}
+        for session_id, credentials in youtube_oauth_tokens.items():
+            if credentials and credentials.token:
+                tokens_data[session_id] = {
+                    'token': credentials.token,
+                    'refresh_token': credentials.refresh_token,
+                    'token_uri': credentials.token_uri,
+                    'client_id': credentials.client_id,
+                    'client_secret': credentials.client_secret,
+                    'scopes': credentials.scopes,
+                    'expiry': credentials.expiry.isoformat() if credentials.expiry else None,
+                }
+        
+        with open(YOUTUBE_TOKENS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(tokens_data, f, indent=2)
+    except Exception as e:
+        print(f"Error guardando tokens de YouTube: {e}")
+
+def load_youtube_tokens():
+    """Carga los tokens de YouTube desde el archivo JSON"""
+    if not YOUTUBE_TOKENS_FILE.exists():
+        return
+    
+    try:
+        with open(YOUTUBE_TOKENS_FILE, 'r', encoding='utf-8') as f:
+            tokens_data = json.load(f)
+        
+        for session_id, token_info in tokens_data.items():
+            try:
+                credentials = Credentials(
+                    token=token_info.get('token'),
+                    refresh_token=token_info.get('refresh_token'),
+                    token_uri=token_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                    client_id=token_info.get('client_id', GOOGLE_CLIENT_ID),
+                    client_secret=token_info.get('client_secret', GOOGLE_CLIENT_SECRET),
+                    scopes=token_info.get('scopes', SCOPES),
+                )
+                
+                if token_info.get('expiry'):
+                    credentials.expiry = datetime.fromisoformat(token_info['expiry'])
+                
+                # Verificar si el token es válido o puede refrescarse
+                if not credentials.valid:
+                    if credentials.refresh_token:
+                        try:
+                            credentials.refresh(Request())
+                            save_youtube_tokens()
+                        except:
+                            continue
+                    else:
+                        continue
+                
+                youtube_oauth_tokens[session_id] = credentials
+            except Exception as e:
+                print(f"Error cargando token para sesión {session_id}: {e}")
+                continue
+    except Exception as e:
+        print(f"Error cargando tokens de YouTube: {e}")
+
+# Cargar tokens al iniciar el servidor
+load_youtube_tokens()
+
 # Configuración OAuth2 de Google/YouTube
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -1081,6 +1149,7 @@ async def youtube_callback(code: str, state: Optional[str] = None):
         # Guardar las credenciales (usar un ID único, por ejemplo de sesión)
         session_id = "default"  # En producción, usar un ID de sesión real
         youtube_oauth_tokens[session_id] = credentials
+        save_youtube_tokens()  # Guardar en archivo
         
         # Redirigir al frontend con éxito
         return RedirectResponse(url=f"{FRONTEND_URL}/?youtube_auth=success")
@@ -1101,9 +1170,20 @@ async def youtube_auth_status():
             if credentials.valid:
                 return {"authenticated": True, "message": "Autenticado con YouTube"}
             else:
-                # Token expirado
-                del youtube_oauth_tokens[session_id]
-                return {"authenticated": False, "message": "Token expirado"}
+                # Intentar refrescar el token
+                if credentials.refresh_token:
+                    try:
+                        credentials.refresh(Request())
+                        save_youtube_tokens()
+                        return {"authenticated": True, "message": "Autenticado con YouTube (token refrescado)"}
+                    except:
+                        del youtube_oauth_tokens[session_id]
+                        save_youtube_tokens()
+                        return {"authenticated": False, "message": "Token expirado y no se pudo refrescar"}
+                else:
+                    del youtube_oauth_tokens[session_id]
+                    save_youtube_tokens()
+                    return {"authenticated": False, "message": "Token expirado"}
         except:
             return {"authenticated": False, "message": "Error verificando token"}
     
@@ -1120,9 +1200,11 @@ def get_youtube_service():
         else:
             try:
                 credentials.refresh(Request())
+                save_youtube_tokens()  # Guardar tokens refrescados
                 return build('youtube', 'v3', credentials=credentials)
             except:
                 del youtube_oauth_tokens[session_id]
+                save_youtube_tokens()  # Guardar después de eliminar
     return None
 
 
