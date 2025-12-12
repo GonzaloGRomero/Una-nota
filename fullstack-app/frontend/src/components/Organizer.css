@@ -247,6 +247,25 @@
     padding: 5px;
     word-wrap: break-word;
   }
+
+  .track-image-container {
+    width: 100%;
+    height: 150px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 4px;
+    background: #f0f0f0;
+  }
+
+  .track-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+  }
   
   .select-track-button {
     width: 100%;
@@ -423,6 +442,54 @@
   .current-track-info p {
     margin: 5px 0;
     color: #333;
+  }
+
+  .lyrics-section {
+    background: #e8f5e9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .lyrics-section h2 {
+    margin-top: 0;
+    color: #333;
+    margin-bottom: 15px;
+  }
+
+  .lyrics-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+  }
+
+  .lyrics-empty {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    font-style: italic;
+  }
+
+  .lyrics-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 14px;
+    color: #333;
+  }
+
+  .lyrics-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: inherit;
   }
   
   .buzzers-section {

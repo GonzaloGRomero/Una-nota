@@ -4,6 +4,8 @@ export type Track = {
   url: string;
   artist?: string;
   video_id?: string;
+  image_url?: string;
+  lyrics?: string;
 };
 
 export type Player = {
