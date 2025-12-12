@@ -1252,7 +1252,8 @@ async def import_playlist_authenticated(data: PlaylistImport):
         raise HTTPException(status_code=400, detail="La playlist está vacía o no tiene videos disponibles")
     
     TRACKS = tracks
-    room = Room(tracks)
+    await room.update_tracks(tracks)
+    await manager.broadcast(build_state_message())
     
     return {
         "success": True,
