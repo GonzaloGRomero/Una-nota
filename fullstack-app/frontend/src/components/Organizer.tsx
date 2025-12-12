@@ -72,6 +72,8 @@ export function Organizer() {
     }
   };
 
+  const currentTrackIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!gameState || !gameState.current_track_id) return;
 
@@ -79,6 +81,12 @@ export function Organizer() {
     if (!currentTrack || !audioRef.current) return;
 
     const audio = audioRef.current;
+    const trackChanged = currentTrackIdRef.current !== gameState.current_track_id;
+
+    // Si cambió el track, actualizar la referencia
+    if (trackChanged) {
+      currentTrackIdRef.current = gameState.current_track_id;
+    }
 
     const playAudio = async () => {
       let audioUrl = currentTrack.url;
@@ -100,7 +108,11 @@ export function Organizer() {
       }
 
       if (!audioUrl) return;
-      audio.src = audioUrl;
+      
+      // Solo cambiar el src si cambió el track o si no hay src establecido
+      if (trackChanged || !audio.src || audio.src !== audioUrl) {
+        audio.src = audioUrl;
+      }
 
       if (gameState.status === 'playing') {
         audio.play().catch(() => {});
@@ -123,15 +135,19 @@ export function Organizer() {
       }
     };
 
+    // Manejar controles de reproducción
     if (gameState.status === 'paused') {
+      // Solo pausar, NO resetear currentTime ni cambiar src
       audio.pause();
     } else if (gameState.status === 'stopped') {
+      // Stop: pausar y resetear a 0
       audio.pause();
       audio.currentTime = 0;
     } else if (['playing', 'preview2', 'preview5'].includes(gameState.status)) {
+      // Reproducir: cargar audio si es necesario y reproducir
       playAudio();
     }
-  }, [gameState, audioCache]);
+  }, [gameState?.status, gameState?.current_track_id, gameState?.tracks, audioCache]);
 
   const handleImportPlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
