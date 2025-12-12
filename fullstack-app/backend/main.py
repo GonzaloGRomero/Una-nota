@@ -27,7 +27,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://juego-en-una-nota.vercel.app",
+        "https://una-nota-two.vercel.app",
         os.getenv("FRONTEND_URL", ""),
     ],
     allow_credentials=True,
@@ -42,7 +42,7 @@ youtube_oauth_tokens: Dict[str, Credentials] = {}
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://juego-en-una-nota-production.up.railway.app/auth/youtube/callback")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://juego-en-una-nota.vercel.app")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://una-nota-two.vercel.app")
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
