@@ -10,15 +10,16 @@ from typing import Dict, List, Optional
 
 import spotipy
 import yt_dlp
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+import requests
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 from spotipy.oauth2 import SpotifyClientCredentials
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request as GoogleRequest
 
 app = FastAPI(title="Music Buzzer API", version="1.0.0")
 
@@ -89,7 +90,7 @@ def load_youtube_tokens():
                 if not credentials.valid:
                     if credentials.refresh_token:
                         try:
-                            credentials.refresh(Request())
+                            credentials.refresh(GoogleRequest())
                             save_youtube_tokens()
                         except:
                             continue
@@ -1278,9 +1279,8 @@ def import_youtube_playlist_authenticated(playlist_id: str) -> tuple[List[Track]
         raise HTTPException(status_code=500, detail=f"Error importando playlist: {str(e)}")
 
 
-@app.get("/youtube/audio/{video_id}")
-async def get_youtube_audio_url(video_id: str):
-    """Obtiene la URL de audio de un video de YouTube bajo demanda"""
+def get_youtube_audio_url_internal(video_id: str) -> Optional[str]:
+    """Obtiene la URL de audio de un video de YouTube (función interna)"""
     try:
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -1298,22 +1298,85 @@ async def get_youtube_audio_url(video_id: str):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             if info and info.get('url'):
-                return {"url": info['url'], "video_id": video_id}
+                return info['url']
             
             formats = info.get('formats', [])
             audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
             if audio_formats:
                 best_audio = max(audio_formats, key=lambda x: x.get('abr', 0) or 0)
-                return {"url": best_audio['url'], "video_id": video_id}
+                return best_audio.get('url')
             
             if formats:
-                return {"url": formats[-1].get('url', ''), "video_id": video_id}
+                return formats[-1].get('url')
         
-        raise HTTPException(status_code=404, detail="No se pudo obtener el audio")
-    except HTTPException:
-        raise
+        return None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo audio: {str(e)}")
+        print(f"Error obteniendo URL de audio: {e}")
+        return None
+
+
+@app.get("/youtube/audio/{video_id}")
+async def get_youtube_audio_url(video_id: str):
+    """Obtiene la URL de audio de un video de YouTube bajo demanda (deprecated, usar /youtube/stream)"""
+    url = get_youtube_audio_url_internal(video_id)
+    if url:
+        return {"url": url, "video_id": video_id}
+    raise HTTPException(status_code=404, detail="No se pudo obtener el audio")
+
+
+@app.get("/youtube/stream/{video_id}")
+async def stream_youtube_audio(video_id: str, request: FastAPIRequest):
+    """Stream del audio de YouTube a través del backend (evita problemas de CORS y 403)"""
+    audio_url = get_youtube_audio_url_internal(video_id)
+    
+    if not audio_url:
+        raise HTTPException(status_code=404, detail="No se pudo obtener el audio")
+    
+    try:
+        # Obtener el header Range del cliente si existe
+        range_header = request.headers.get('Range', '')
+        
+        headers = {
+            'Referer': 'https://www.youtube.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        }
+        
+        if range_header:
+            headers['Range'] = range_header
+        
+        response = requests.get(audio_url, headers=headers, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        def generate():
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        
+        response_headers = {
+            "Accept-Ranges": "bytes",
+            "Content-Type": response.headers.get("Content-Type", "audio/webm"),
+        }
+        
+        # Si hay Range, copiar los headers de respuesta relevantes
+        if range_header:
+            if 'Content-Range' in response.headers:
+                response_headers['Content-Range'] = response.headers['Content-Range']
+            if 'Content-Length' in response.headers:
+                response_headers['Content-Length'] = response.headers['Content-Length']
+        else:
+            if 'Content-Length' in response.headers:
+                response_headers['Content-Length'] = response.headers['Content-Length']
+        
+        status_code = 206 if range_header else 200
+        
+        return StreamingResponse(
+            generate(),
+            status_code=status_code,
+            media_type="audio/webm",
+            headers=response_headers
+        )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error streaming audio: {str(e)}")
 
 
 @app.post("/playlist/import-authenticated")

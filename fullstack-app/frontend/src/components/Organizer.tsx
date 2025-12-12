@@ -204,16 +204,8 @@ export function Organizer() {
   };
 
   const fetchAudioUrl = async (videoId: string): Promise<string | null> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/youtube/audio/${videoId}`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.url;
-      }
-    } catch {
-      // Error silencioso
-    }
-    return null;
+    // Usar el endpoint de streaming que evita problemas de CORS y 403
+    return `${API_BASE_URL}/youtube/stream/${videoId}`;
   };
 
   const getShuffledTracks = (): Track[] => {
