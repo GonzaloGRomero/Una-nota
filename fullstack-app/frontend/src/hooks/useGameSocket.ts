@@ -26,10 +26,10 @@ export function useGameSocket() {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pointAwardedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const joinErrorRef = useRef<string | null>(null);
-  const connectParamsRef = useRef<{ name: string; role: 'player' | 'organizer' } | null>(null);
+  const connectParamsRef = useRef<{ name: string; role: 'player' | 'organizer'; roomName: string; password: string } | null>(null);
   const isConnectingRef = useRef<boolean>(false);
 
-  const connect = useCallback((name: string, role: 'player' | 'organizer' = 'player') => {
+  const connect = useCallback((name: string, role: 'player' | 'organizer' = 'player', roomName: string, password: string) => {
     if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -39,7 +39,7 @@ export function useGameSocket() {
     }
 
     isConnectingRef.current = true;
-    connectParamsRef.current = { name, role };
+    connectParamsRef.current = { name, role, roomName, password };
     
     if (wsRef.current) {
       try {
@@ -65,7 +65,7 @@ export function useGameSocket() {
     ws.onopen = () => {
       setConnected(true);
       isConnectingRef.current = false;
-      ws.send(JSON.stringify({ type: 'join', name, role }));
+      ws.send(JSON.stringify({ type: 'join', name, role, room_name: roomName, password: password }));
     };
 
     ws.onmessage = (event) => {
@@ -156,7 +156,12 @@ export function useGameSocket() {
       if (shouldReconnect && connectParamsRef.current) {
         reconnectTimeoutRef.current = setTimeout(() => {
           if (connectParamsRef.current) {
-            connect(connectParamsRef.current.name, connectParamsRef.current.role);
+            connect(
+              connectParamsRef.current.name,
+              connectParamsRef.current.role,
+              connectParamsRef.current.roomName,
+              connectParamsRef.current.password
+            );
           }
         }, 3000);
       } else {

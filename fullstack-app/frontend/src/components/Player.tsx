@@ -3,7 +3,12 @@ import { useGameSocket } from '../hooks/useGameSocket';
 import { Player as PlayerType } from '../types';
 import './Player.css';
 
-export function Player() {
+interface PlayerProps {
+  roomName: string;
+  password: string;
+}
+
+export function Player({ roomName, password }: PlayerProps) {
   const { connected, gameState, playerId, connect, buzz, lastPointAwarded, joinError } = useGameSocket();
   const [name, setName] = useState('');
   const [joined, setJoined] = useState(false);
@@ -16,9 +21,9 @@ export function Player() {
   }, [gameState]);
 
   const handleJoin = () => {
-    if (name.trim()) {
+    if (name.trim() && roomName && password) {
       setJoined(true);
-      connect(name.trim(), 'player');
+      connect(name.trim(), 'player', roomName, password);
     }
   };
 

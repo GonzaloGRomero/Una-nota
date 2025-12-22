@@ -5,7 +5,12 @@ import './Organizer.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-export function Organizer() {
+interface OrganizerProps {
+  roomName: string;
+  password: string;
+}
+
+export function Organizer({ roomName, password }: OrganizerProps) {
   const { connected, gameState, connect, control, setWinner, adjustScore, nextTrack, selectTrack, removePlayer } = useGameSocket();
   const [name, setName] = useState('Organizador');
   const [joined, setJoined] = useState(false);
@@ -26,11 +31,11 @@ export function Organizer() {
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!joined && name) {
-      connect(name, 'organizer');
+    if (!joined && name && roomName && password) {
+      connect(name, 'organizer', roomName, password);
       setJoined(true);
     }
-  }, [name, joined, connect]);
+  }, [name, joined, roomName, password, connect]);
 
   useEffect(() => {
     const checkYoutubeAuth = async () => {
@@ -160,7 +165,8 @@ export function Organizer() {
         },
         body: JSON.stringify({ 
           playlist_url: trimmedUrl,
-          source: playlistSource 
+          source: playlistSource,
+          room_name: roomName
         }),
       });
 

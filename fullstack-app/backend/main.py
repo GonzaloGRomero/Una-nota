@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import spotipy
 import yt_dlp
 import requests
+import bcrypt
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request as FastAPIRequest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -144,6 +145,17 @@ class GameState(BaseModel):
 class PlaylistImport(BaseModel):
     playlist_url: str
     source: Optional[str] = None  # "spotify" o "youtube", None para auto-detectar
+    room_name: Optional[str] = None  # Nombre de la sala (requerido para salas)
+
+
+class CreateRoomRequest(BaseModel):
+    room_name: str
+    password: str
+
+
+class JoinRoomRequest(BaseModel):
+    room_name: str
+    password: str
 
 
 TRACKS: List[Track] = [
@@ -376,33 +388,112 @@ class Room:
             self.reset_queue()
 
 
-room = Room(TRACKS)
+class RoomManager:
+    """Gestiona múltiples salas de juego"""
+    def __init__(self):
+        self.rooms: Dict[str, Dict] = {}  # room_name -> {password_hash, room_instance, created_at}
+        self._lock = asyncio.Lock()
+    
+    async def create_room(self, room_name: str, password: str) -> bool:
+        """Crea una nueva sala con contraseña hasheada"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            if room_name_clean in self.rooms:
+                return False  # Sala ya existe
+            
+            # Hash de la contraseña
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            # Crear nueva instancia de Room para esta sala
+            new_room = Room(TRACKS.copy())
+            
+            self.rooms[room_name_clean] = {
+                'password_hash': password_hash,
+                'room': new_room,
+                'created_at': datetime.now()
+            }
+            return True
+    
+    async def join_room(self, room_name: str, password: str) -> Optional[Room]:
+        """Valida la contraseña y retorna la instancia de Room si es correcta"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            if room_name_clean not in self.rooms:
+                return None  # Sala no existe
+            
+            room_data = self.rooms[room_name_clean]
+            password_hash = room_data['password_hash']
+            
+            # Verificar contraseña
+            if bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
+                return room_data['room']
+            return None
+    
+    async def room_exists(self, room_name: str) -> bool:
+        """Verifica si una sala existe"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            return room_name_clean in self.rooms
+    
+    async def get_room(self, room_name: str) -> Optional[Room]:
+        """Obtiene la instancia de Room sin validar contraseña (para uso interno)"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            if room_name_clean in self.rooms:
+                return self.rooms[room_name_clean]['room']
+            return None
+
+
+room_manager = RoomManager()
+room = Room(TRACKS)  # Mantener para compatibilidad temporal
 
 
 class ConnectionManager:
     def __init__(self) -> None:
         self.active: Dict[WebSocket, Dict[str, Optional[str]]] = {}
+        self.rooms: Dict[str, List[WebSocket]] = {}  # room_name -> [websockets]
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        self.active[websocket] = {"player_id": None, "role": None}
+        self.active[websocket] = {"player_id": None, "role": None, "room_name": None}
 
-    def set_identity(self, websocket: WebSocket, player_id: Optional[str], role: Optional[str]) -> None:
+    def set_identity(self, websocket: WebSocket, player_id: Optional[str], role: Optional[str], room_name: Optional[str] = None) -> None:
         if websocket in self.active:
             self.active[websocket]["player_id"] = player_id
             self.active[websocket]["role"] = role
+            if room_name:
+                self.active[websocket]["room_name"] = room_name
+                # Agregar a la lista de conexiones de la sala
+                if room_name not in self.rooms:
+                    self.rooms[room_name] = []
+                if websocket not in self.rooms[room_name]:
+                    self.rooms[room_name].append(websocket)
 
     def disconnect(self, websocket: WebSocket) -> Optional[str]:
         info = self.active.pop(websocket, None)
+        room_name = info.get("room_name") if info else None
+        if room_name and room_name in self.rooms:
+            self.rooms[room_name] = [ws for ws in self.rooms[room_name] if ws != websocket]
+            if not self.rooms[room_name]:
+                del self.rooms[room_name]
         return info.get("player_id") if info else None
     
-    def get_active_player_ids(self) -> set:
-        """Retorna un set con los IDs de jugadores activos (conectados)"""
+    def get_active_player_ids(self, room_name: Optional[str] = None) -> set:
+        """Retorna un set con los IDs de jugadores activos (conectados) en una sala específica"""
+        if room_name:
+            room_websockets = self.rooms.get(room_name, [])
+            return {self.active[ws]["player_id"] for ws in room_websockets if self.active.get(ws, {}).get("player_id")}
         return {info["player_id"] for info in self.active.values() if info.get("player_id")}
 
-    async def broadcast(self, message: Dict) -> None:
+    async def broadcast(self, message: Dict, room_name: Optional[str] = None) -> None:
+        """Broadcast a todos los clientes o solo a los de una sala específica"""
+        if room_name:
+            targets = self.rooms.get(room_name, [])
+        else:
+            targets = list(self.active.keys())
+        
         dead = []
-        for ws in self.active:
+        for ws in targets:
             try:
                 await ws.send_json(message)
             except Exception:
@@ -414,8 +505,9 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-def build_state_message() -> Dict:
-    return {"type": "state", "payload": room.to_state().model_dump()}
+def build_state_message(room_instance: Optional[Room] = None) -> Dict:
+    target_room = room_instance or room
+    return {"type": "state", "payload": target_room.to_state().model_dump()}
 
 
 @app.get("/tracks", response_model=List[Track])
@@ -434,7 +526,9 @@ async def get_state():
 @app.websocket("/ws/sala")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
-    await websocket.send_json(build_state_message())
+    current_room: Optional[Room] = None
+    room_name: Optional[str] = None
+    
     try:
         while True:
             data = await websocket.receive_json()
@@ -443,11 +537,35 @@ async def websocket_endpoint(websocket: WebSocket):
                 try:
                     name = data.get("name", "Jugador")
                     role = data.get("role", "player")
-                    print(f"[DEBUG] Received join: name={name}, role={role}")
+                    room_name_param = data.get("room_name")
+                    password = data.get("password", "")
+                    
+                    print(f"[DEBUG] Received join: name={name}, role={role}, room_name={room_name_param}")
+                    
+                    # Validar sala y contraseña
+                    if not room_name_param:
+                        await websocket.send_json({
+                            "type": "join_error",
+                            "payload": {"message": "Nombre de sala requerido"}
+                        })
+                        continue
+                    
+                    room_instance = await room_manager.join_room(room_name_param, password)
+                    if not room_instance:
+                        await websocket.send_json({
+                            "type": "join_error",
+                            "payload": {"message": "Nombre de sala o contraseña incorrectos"}
+                        })
+                        continue
+                    
+                    # Sala válida, usar esta instancia
+                    current_room = room_instance
+                    room_name = room_name_param.strip().lower()
+                    
                     if role == "player":
-                        active_ids = manager.get_active_player_ids()
-                        print(f"[DEBUG] Active player IDs: {active_ids}")
-                        player, is_reused = await room.add_player(name, active_ids)
+                        active_ids = manager.get_active_player_ids(room_name)
+                        print(f"[DEBUG] Active player IDs in room {room_name}: {active_ids}")
+                        player, is_reused = await current_room.add_player(name, active_ids)
                         print(f"[DEBUG] Player created/reused: {player.id if player else None}, is_reused={is_reused}")
                         if player is None:
                             # Nombre en uso por conexión activa
@@ -457,22 +575,22 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "payload": {"message": "Este nombre ya está en uso por un jugador conectado. Por favor elige otro nombre."}
                             })
                         else:
-                            manager.set_identity(websocket, player.id, role)
-                            print(f"[DEBUG] Set identity: player_id={player.id}, role={role}")
+                            manager.set_identity(websocket, player.id, role, room_name)
+                            print(f"[DEBUG] Set identity: player_id={player.id}, role={role}, room={room_name}")
                             if is_reused:
                                 # Si se reutilizó, notificar que el jugador volvió
-                                await manager.broadcast({"type": "player_rejoin", "payload": player.model_dump()})
+                                await manager.broadcast({"type": "player_rejoin", "payload": player.model_dump()}, room_name)
                             else:
                                 # Si es nuevo, notificar normalmente
-                                await manager.broadcast({"type": "player_join", "payload": player.model_dump()})
+                                await manager.broadcast({"type": "player_join", "payload": player.model_dump()}, room_name)
                             print(f"[DEBUG] Sending join_ack for player {player.id}")
                             await websocket.send_json({"type": "join_ack", "payload": {"playerId": player.id, "isReused": is_reused}})
-                            await websocket.send_json(build_state_message())
+                            await websocket.send_json(build_state_message(current_room))
                             print(f"[DEBUG] Join completed successfully for player {player.id}")
                     else:
-                        manager.set_identity(websocket, None, role)
+                        manager.set_identity(websocket, None, role, room_name)
                         await websocket.send_json({"type": "join_ack", "payload": {"playerId": None}})
-                        await websocket.send_json(build_state_message())
+                        await websocket.send_json(build_state_message(current_room))
                 except Exception as e:
                     print(f"[ERROR] Error processing join message: {str(e)}")
                     import traceback
@@ -481,85 +599,102 @@ async def websocket_endpoint(websocket: WebSocket):
                         "type": "join_error",
                         "payload": {"message": f"Error procesando la solicitud: {str(e)}"}
                     })
-            elif msg_type == "buzz":
-                player_id = data.get("playerId")
-                accepted = await room.record_buzz(player_id)
-                if accepted:
-                    await manager.broadcast({"type": "buzzer", "payload": {"queue": room.buzz_queue}})
-                    await manager.broadcast({"type": "control", "payload": {"status": room.status}})
-            elif msg_type == "control":
-                action = data.get("action")
-                if action in {"play", "pause", "stop", "preview2", "preview5"}:
-                    status_map = {
-                        "play": "playing",
-                        "pause": "paused",
-                        "stop": "stopped",
-                        "preview2": "preview2",
-                        "preview5": "preview5",
-                    }
-                    await room.set_status(status_map[action])
-                    await manager.broadcast({"type": "control", "payload": {"status": room.status}})
-            elif msg_type == "set_winner":
-                player_id = data.get("playerId")
-                winner = await room.set_winner(player_id)
-                if winner:
-                    # Obtener información de la canción actual
-                    current_track = next((t for t in room.tracks if t.id == room.current_track_id), None)
-                    track_info = {}
-                    if current_track:
-                        # Parsear título y artista
-                        parts = current_track.title.split(' - ', 1)
-                        track_info = {
-                            "title": parts[0] if parts else current_track.title,
-                            "artist": parts[1] if len(parts) > 1 else "Artista desconocido"
+            else:
+                # Para otros mensajes, obtener la sala de la conexión
+                if not current_room:
+                    room_name_from_ws = manager.active.get(websocket, {}).get("room_name")
+                    if room_name_from_ws:
+                        current_room = await room_manager.get_room(room_name_from_ws)
+                        room_name = room_name_from_ws
+                
+                if not current_room:
+                    await websocket.send_json({
+                        "type": "error",
+                        "payload": {"message": "Debes unirte a una sala primero"}
+                    })
+                    continue
+                
+                if msg_type == "buzz":
+                    player_id = data.get("playerId")
+                    accepted = await current_room.record_buzz(player_id)
+                    if accepted:
+                        await manager.broadcast({"type": "buzzer", "payload": {"queue": current_room.buzz_queue}}, room_name)
+                        await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                elif msg_type == "control":
+                    action = data.get("action")
+                    if action in {"play", "pause", "stop", "preview2", "preview5"}:
+                        status_map = {
+                            "play": "playing",
+                            "pause": "paused",
+                            "stop": "stopped",
+                            "preview2": "preview2",
+                            "preview5": "preview5",
                         }
-                    await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in room.players.items()}}})
-                    await manager.broadcast({"type": "buzzer", "payload": {"queue": room.buzz_queue}})
-                    await manager.broadcast({"type": "control", "payload": {"status": room.status}})
-                    await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": winner.name, "points": 1, "track": track_info}})
-            elif msg_type == "adjust_score":
-                player_id = data.get("playerId")
-                points = data.get("points", 0)
-                adjusted_player = await room.adjust_score(player_id, points)
-                if adjusted_player:
-                    # Obtener información de la canción actual
-                    current_track = next((t for t in room.tracks if t.id == room.current_track_id), None)
-                    track_info = {}
-                    if current_track:
-                        # Parsear título y artista
-                        parts = current_track.title.split(' - ', 1)
-                        track_info = {
-                            "title": parts[0] if parts else current_track.title,
-                            "artist": parts[1] if len(parts) > 1 else "Artista desconocido"
-                        }
-                    await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in room.players.items()}}})
-                    await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": adjusted_player.name, "points": points, "track": track_info}})
-            elif msg_type == "next_track":
-                await room.next_track()
-                await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": room.current_track_id}})
-                await manager.broadcast({"type": "control", "payload": {"status": room.status}})
-            elif msg_type == "select_track":
-                track_id = data.get("trackId")
-                if track_id:
-                    async with room._lock:
-                        if any(t.id == track_id for t in room.tracks):
-                            room.current_track_id = track_id
-                            room.status = "stopped"
-                            room.buzz_queue = []
-                    await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": room.current_track_id}})
-                    await manager.broadcast({"type": "control", "payload": {"status": room.status}})
-            elif msg_type == "remove_player":
-                player_id_to_remove = data.get("playerId")
-                if player_id_to_remove:
-                    await room.remove_player(player_id_to_remove)
-                    await manager.broadcast({"type": "player_leave", "payload": {"playerId": player_id_to_remove}})
-                    await manager.broadcast(build_state_message())
+                        await current_room.set_status(status_map[action])
+                        await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                elif msg_type == "set_winner":
+                    player_id = data.get("playerId")
+                    winner = await current_room.set_winner(player_id)
+                    if winner:
+                        # Obtener información de la canción actual
+                        current_track = next((t for t in current_room.tracks if t.id == current_room.current_track_id), None)
+                        track_info = {}
+                        if current_track:
+                            # Parsear título y artista
+                            parts = current_track.title.split(' - ', 1)
+                            track_info = {
+                                "title": parts[0] if parts else current_track.title,
+                                "artist": parts[1] if len(parts) > 1 else "Artista desconocido"
+                            }
+                        await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in current_room.players.items()}}}, room_name)
+                        await manager.broadcast({"type": "buzzer", "payload": {"queue": current_room.buzz_queue}}, room_name)
+                        await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                        await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": winner.name, "points": 1, "track": track_info}}, room_name)
+                elif msg_type == "adjust_score":
+                    player_id = data.get("playerId")
+                    points = data.get("points", 0)
+                    adjusted_player = await current_room.adjust_score(player_id, points)
+                    if adjusted_player:
+                        # Obtener información de la canción actual
+                        current_track = next((t for t in current_room.tracks if t.id == current_room.current_track_id), None)
+                        track_info = {}
+                        if current_track:
+                            # Parsear título y artista
+                            parts = current_track.title.split(' - ', 1)
+                            track_info = {
+                                "title": parts[0] if parts else current_track.title,
+                                "artist": parts[1] if len(parts) > 1 else "Artista desconocido"
+                            }
+                        await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in current_room.players.items()}}}, room_name)
+                        await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": adjusted_player.name, "points": points, "track": track_info}}, room_name)
+                elif msg_type == "next_track":
+                    await current_room.next_track()
+                    await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
+                    await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                elif msg_type == "select_track":
+                    track_id = data.get("trackId")
+                    if track_id:
+                        async with current_room._lock:
+                            if any(t.id == track_id for t in current_room.tracks):
+                                current_room.current_track_id = track_id
+                                current_room.status = "stopped"
+                                current_room.buzz_queue = []
+                        await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
+                        await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                elif msg_type == "remove_player":
+                    player_id_to_remove = data.get("playerId")
+                    if player_id_to_remove:
+                        await current_room.remove_player(player_id_to_remove)
+                        await manager.broadcast({"type": "player_leave", "payload": {"playerId": player_id_to_remove}}, room_name)
+                        await manager.broadcast(build_state_message(current_room), room_name)
     except WebSocketDisconnect:
         player_id = manager.disconnect(websocket)
-        if player_id:
-            await room.remove_player(player_id)
-            await manager.broadcast({"type": "player_leave", "payload": {"playerId": player_id}})
-            await manager.broadcast(build_state_message())
+        if player_id and room_name:
+            room_instance = await room_manager.get_room(room_name)
+            if room_instance:
+                await room_instance.remove_player(player_id)
+                await manager.broadcast({"type": "player_leave", "payload": {"playerId": player_id}}, room_name)
+                await manager.broadcast(build_state_message(room_instance), room_name)
 
 
 def get_youtube_cookies_path() -> Optional[str]:
@@ -941,6 +1076,17 @@ async def import_playlist(playlist_data: PlaylistImport):
     """Importa una playlist de Spotify o YouTube Music y actualiza los tracks del juego"""
     try:
         playlist_url = playlist_data.playlist_url.strip()
+        room_name_param = playlist_data.room_name
+        
+        # Obtener la sala correcta
+        target_room = None
+        if room_name_param:
+            target_room = await room_manager.get_room(room_name_param)
+            if not target_room:
+                raise HTTPException(status_code=404, detail="Sala no encontrada")
+        else:
+            target_room = room  # Usar sala por defecto para compatibilidad
+        
         # Obtener source del modelo, con valor por defecto
         source = getattr(playlist_data, 'source', None)
         if source:
@@ -972,8 +1118,11 @@ async def import_playlist(playlist_data: PlaylistImport):
                         detail=f"No se pudieron obtener canciones de la playlist de YouTube. Verifica que la playlist sea pública y tenga videos disponibles."
                     )
                 
-                await room.update_tracks(tracks)
-                await manager.broadcast(build_state_message())
+                await target_room.update_tracks(tracks)
+                if room_name_param:
+                    await manager.broadcast(build_state_message(target_room), room_name_param)
+                else:
+                    await manager.broadcast(build_state_message(target_room))
                 
                 message = f"Playlist de YouTube importada exitosamente. {len(tracks)} canciones cargadas."
                 if tracks_without_url > 0:
@@ -1088,8 +1237,11 @@ async def import_playlist(playlist_data: PlaylistImport):
             detail_msg += f"o (3) Problemas de conexión. Intenta con otra playlist o verifica tu conexión a internet."
             raise HTTPException(status_code=400, detail=detail_msg)
         
-        await room.update_tracks(tracks)
-        await manager.broadcast(build_state_message())
+        await target_room.update_tracks(tracks)
+        if room_name_param:
+            await manager.broadcast(build_state_message(target_room), room_name_param)
+        else:
+            await manager.broadcast(build_state_message(target_room))
         
         message = f"Playlist importada exitosamente. {tracks_found} canciones cargadas."
         if tracks_without_url > 0:
@@ -1414,7 +1566,7 @@ async def stream_youtube_audio(video_id: str, request: FastAPIRequest):
 @app.post("/playlist/import-authenticated")
 async def import_playlist_authenticated(data: PlaylistImport):
     """Importa una playlist de YouTube usando la API autenticada (rápido, sin detección de bots)"""
-    global TRACKS, room
+    global TRACKS
     
     playlist_id = extract_youtube_playlist_id(data.playlist_url)
     if not playlist_id:
@@ -1423,14 +1575,31 @@ async def import_playlist_authenticated(data: PlaylistImport):
             detail="URL de playlist de YouTube inválida"
         )
     
+    room_name_param = data.room_name
+    
+    # Obtener la sala correcta
+    target_room = None
+    if room_name_param:
+        target_room = await room_manager.get_room(room_name_param)
+        if not target_room:
+            raise HTTPException(status_code=404, detail="Sala no encontrada")
+    else:
+        target_room = room  # Usar sala por defecto para compatibilidad
+        TRACKS = []  # Solo actualizar TRACKS global si no hay sala específica
+    
     tracks, playlist_name = import_youtube_playlist_authenticated(playlist_id)
     
     if not tracks:
         raise HTTPException(status_code=400, detail="La playlist está vacía o no tiene videos disponibles")
     
-    TRACKS = tracks
-    await room.update_tracks(tracks)
-    await manager.broadcast(build_state_message())
+    if not room_name_param:
+        TRACKS = tracks
+    
+    await target_room.update_tracks(tracks)
+    if room_name_param:
+        await manager.broadcast(build_state_message(target_room), room_name_param)
+    else:
+        await manager.broadcast(build_state_message(target_room))
     
     return {
         "success": True,
@@ -1440,6 +1609,48 @@ async def import_playlist_authenticated(data: PlaylistImport):
         "total_tracks": len(tracks),
         "requires_audio_fetch": True  # Indica que las URLs se cargan bajo demanda
     }
+
+
+@app.post("/rooms/create")
+async def create_room(data: CreateRoomRequest):
+    """Crea una nueva sala con nombre y contraseña"""
+    if not data.room_name or not data.room_name.strip():
+        raise HTTPException(status_code=400, detail="El nombre de la sala no puede estar vacío")
+    
+    if not data.password or len(data.password) < 4:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 4 caracteres")
+    
+    if len(data.room_name) > 50:
+        raise HTTPException(status_code=400, detail="El nombre de la sala es demasiado largo (máximo 50 caracteres)")
+    
+    success = await room_manager.create_room(data.room_name, data.password)
+    if not success:
+        raise HTTPException(status_code=400, detail="La sala ya existe")
+    
+    return {"success": True, "message": f"Sala '{data.room_name}' creada exitosamente", "room_name": data.room_name}
+
+
+@app.post("/rooms/join")
+async def join_room(data: JoinRoomRequest):
+    """Valida la contraseña y permite unirse a una sala"""
+    if not data.room_name or not data.room_name.strip():
+        raise HTTPException(status_code=400, detail="El nombre de la sala no puede estar vacío")
+    
+    if not data.password:
+        raise HTTPException(status_code=400, detail="La contraseña es requerida")
+    
+    room_instance = await room_manager.join_room(data.room_name, data.password)
+    if not room_instance:
+        raise HTTPException(status_code=401, detail="Nombre de sala o contraseña incorrectos")
+    
+    return {"success": True, "message": f"Unido a la sala '{data.room_name}' exitosamente", "room_name": data.room_name}
+
+
+@app.get("/rooms/check/{room_name}")
+async def check_room(room_name: str):
+    """Verifica si una sala existe (sin validar contraseña)"""
+    exists = await room_manager.room_exists(room_name)
+    return {"exists": exists, "room_name": room_name}
 
 
 @app.get("/")
