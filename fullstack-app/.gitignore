@@ -53,6 +53,8 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+# Pero permitir .env.example para documentación
+!.env.example
 
 # Logs
 logs/
