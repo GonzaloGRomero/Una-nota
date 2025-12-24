@@ -95,7 +95,7 @@ export function Admin() {
   };
 
   const handleCloseRoom = async (roomName: string) => {
-    if (!confirm(`¿Estás seguro de que quieres cerrar la sala "${roomName}"? Todos los jugadores serán desconectados.`)) {
+    if (!window.confirm(`¿Estás seguro de que quieres cerrar la sala "${roomName}"? Todos los jugadores serán desconectados.`)) {
       return;
     }
 
@@ -127,7 +127,7 @@ export function Admin() {
   };
 
   const handleBanPlayer = async (roomName: string, playerId: string, playerName: string) => {
-    if (!confirm(`¿Estás seguro de que quieres expulsar a "${playerName}" de la sala "${roomName}"?`)) {
+    if (!window.confirm(`¿Estás seguro de que quieres expulsar a "${playerName}" de la sala "${roomName}"?`)) {
       return;
     }
 

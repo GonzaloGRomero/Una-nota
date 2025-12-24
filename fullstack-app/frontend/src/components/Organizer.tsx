@@ -322,7 +322,6 @@ export function Organizer({ roomName, password }: OrganizerProps) {
         <button onClick={handleBackToHome} className="back-to-menu-button" title="Volver al menú principal">
           🏠 Volver al Menú
         </button>
-        </div>
       </div>
 
       <audio ref={audioRef} preload="auto" />
