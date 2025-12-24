@@ -670,16 +670,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Para otros mensajes, obtener la sala de la conexión
                 if not current_room:
                     room_name_from_ws = manager.active.get(websocket, {}).get("room_name")
+                    print(f"[DEBUG] No hay current_room, buscando desde WS: room_name={room_name_from_ws}")
                     if room_name_from_ws:
                         current_room = await room_manager.get_room(room_name_from_ws)
                         room_name = room_name_from_ws
+                        print(f"[DEBUG] Room obtenida desde WS: {current_room is not None}")
                 
                 if not current_room:
+                    print(f"[DEBUG] ERROR: No hay current_room para procesar mensaje tipo: {msg_type}")
                     await websocket.send_json({
                         "type": "error",
                         "payload": {"message": "Debes unirte a una sala primero"}
                     })
                     continue
+                
+                print(f"[DEBUG] Procesando mensaje tipo: {msg_type}, room_name: {room_name}, current_room existe: {current_room is not None}")
                 
                 if msg_type == "buzz":
                     player_id = data.get("playerId")
@@ -689,6 +694,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
                 elif msg_type == "control":
                     action = data.get("action")
+                    print(f"[DEBUG] Control action recibida: {action}")
                     if action in {"play", "pause", "stop", "preview2", "preview5"}:
                         status_map = {
                             "play": "playing",
@@ -697,8 +703,14 @@ async def websocket_endpoint(websocket: WebSocket):
                             "preview2": "preview2",
                             "preview5": "preview5",
                         }
-                        await current_room.set_status(status_map[action])
+                        new_status = status_map[action]
+                        print(f"[DEBUG] Cambiando status a: {new_status}")
+                        await current_room.set_status(new_status)
+                        print(f"[DEBUG] Status después de set_status: {current_room.status}")
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                        print(f"[DEBUG] Broadcast enviado con status: {current_room.status}")
+                    else:
+                        print(f"[DEBUG] Action inválida: {action}")
                 elif msg_type == "set_winner":
                     player_id = data.get("playerId")
                     winner = await current_room.set_winner(player_id)
@@ -735,19 +747,29 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in current_room.players.items()}}}, room_name)
                         await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": adjusted_player.name, "points": points, "track": track_info}}, room_name)
                 elif msg_type == "next_track":
+                    print(f"[DEBUG] next_track recibido, current_track_id antes: {current_room.current_track_id}")
                     await current_room.next_track()
+                    print(f"[DEBUG] next_track ejecutado, current_track_id después: {current_room.current_track_id}, status: {current_room.status}")
                     await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
                     await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                    print(f"[DEBUG] Broadcasts enviados para next_track")
                 elif msg_type == "select_track":
                     track_id = data.get("trackId")
+                    print(f"[DEBUG] select_track recibido, track_id: {track_id}")
                     if track_id:
                         async with current_room._lock:
-                            if any(t.id == track_id for t in current_room.tracks):
+                            track_exists = any(t.id == track_id for t in current_room.tracks)
+                            print(f"[DEBUG] Track existe: {track_exists}, total tracks: {len(current_room.tracks)}")
+                            if track_exists:
                                 current_room.current_track_id = track_id
                                 current_room.status = "stopped"
                                 current_room.buzz_queue = []
+                                print(f"[DEBUG] Track seleccionado, current_track_id: {current_room.current_track_id}, status: {current_room.status}")
                         await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
+                        print(f"[DEBUG] Broadcasts enviados para select_track")
+                    else:
+                        print(f"[DEBUG] select_track: track_id es None o vacío")
                 elif msg_type == "remove_player":
                     player_id_to_remove = data.get("playerId")
                     if player_id_to_remove:
