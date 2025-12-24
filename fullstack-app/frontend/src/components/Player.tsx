@@ -83,13 +83,22 @@ export function Player({ roomName, password }: PlayerProps) {
 
   const myPlayer = getMyPlayer();
 
+  const handleBackToHome = () => {
+    window.location.href = '/';
+  };
+
   return (
     <div className="player-container">
       <div className="player-header">
-        <h1>🎮 {name}</h1>
-        <div className="connection-status">
-          {connected ? '🟢 Conectado' : '🔴 Desconectado'}
+        <div className="header-left">
+          <h1>🎮 {name}</h1>
+          <div className="connection-status">
+            {connected ? '🟢 Conectado' : '🔴 Desconectado'}
+          </div>
         </div>
+        <button onClick={handleBackToHome} className="back-to-menu-button" title="Volver al menú principal">
+          🏠 Volver al Menú
+        </button>
       </div>
 
       <div className="game-info-section">

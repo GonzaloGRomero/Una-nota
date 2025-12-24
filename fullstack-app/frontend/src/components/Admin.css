@@ -66,6 +66,24 @@
   cursor: not-allowed;
 }
 
+.back-to-menu-button-auth {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.back-to-menu-button-auth:hover {
+  background: #5a6268;
+}
+
 .admin-header {
   display: flex;
   justify-content: space-between;
@@ -75,10 +93,32 @@
   border-bottom: 2px solid #e0e0e0;
 }
 
+.admin-header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .admin-header h1 {
   margin: 0;
   color: #333;
   font-size: 2rem;
+}
+
+.back-to-menu-button {
+  padding: 10px 20px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.back-to-menu-button:hover {
+  background: #5a6268;
 }
 
 .logout-button {

@@ -306,12 +306,22 @@ export function Organizer({ roomName, password }: OrganizerProps) {
     );
   }
 
+  const handleBackToHome = () => {
+    window.location.href = '/';
+  };
+
   return (
     <div className="organizer-container">
       <div className="organizer-header">
-        <h1>🎵 Organizador</h1>
-        <div className="connection-status">
-          {connected ? '🟢 Conectado' : '🔴 Desconectado'}
+        <div className="header-left">
+          <h1>🎵 Organizador</h1>
+          <div className="connection-status">
+            {connected ? '🟢 Conectado' : '🔴 Desconectado'}
+          </div>
+        </div>
+        <button onClick={handleBackToHome} className="back-to-menu-button" title="Volver al menú principal">
+          🏠 Volver al Menú
+        </button>
         </div>
       </div>
 

@@ -165,6 +165,10 @@ export function Admin() {
     }
   }, [authenticated, adminPassword]);
 
+  const handleBackToHome = () => {
+    window.location.href = '/';
+  };
+
   if (!authenticated) {
     return (
       <div className="admin-container">
@@ -186,6 +190,9 @@ export function Admin() {
               {loading ? 'Verificando...' : 'Ingresar'}
             </button>
           </form>
+          <button onClick={handleBackToHome} className="back-to-menu-button-auth">
+            🏠 Volver al Menú
+          </button>
         </div>
       </div>
     );
@@ -195,9 +202,14 @@ export function Admin() {
     <div className="admin-container">
       <div className="admin-header">
         <h1>🔐 Panel de Administrador</h1>
-        <button onClick={() => setAuthenticated(false)} className="logout-button">
-          Cerrar Sesión
-        </button>
+        <div className="admin-header-buttons">
+          <button onClick={handleBackToHome} className="back-to-menu-button">
+            🏠 Volver al Menú
+          </button>
+          <button onClick={() => setAuthenticated(false)} className="logout-button">
+            Cerrar Sesión
+          </button>
+        </div>
       </div>
 
       <div className="admin-content">

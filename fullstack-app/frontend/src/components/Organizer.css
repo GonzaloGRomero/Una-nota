@@ -5,24 +5,46 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   }
   
-  .organizer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-  }
-  
-  .organizer-header h1 {
-    margin: 0;
-    color: #333;
-  }
-  
-  .connection-status {
-    font-size: 14px;
-    padding: 8px 16px;
-    background: #f5f5f5;
-    border-radius: 4px;
-  }
+.organizer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.organizer-header h1 {
+  margin: 0;
+  color: #333;
+}
+
+.connection-status {
+  font-size: 14px;
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.back-to-menu-button {
+  padding: 10px 20px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.back-to-menu-button:hover {
+  background: #5a6268;
+}
   
   .join-form {
     max-width: 400px;
