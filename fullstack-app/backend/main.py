@@ -24,14 +24,27 @@ from google.auth.transport.requests import Request as GoogleRequest
 
 app = FastAPI(title="Music Buzzer API", version="1.0.0")
 
-# Configurar CORS - Filtrar valores vacíos
+# Configurar CORS
 frontend_url = os.getenv("FRONTEND_URL", "").strip()
 cors_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:5173",  # Vite default port
 ]
+
+# Agregar URL del frontend si está configurada
 if frontend_url:
     cors_origins.append(frontend_url)
+    # También agregar sin trailing slash
+    if frontend_url.endswith('/'):
+        cors_origins.append(frontend_url.rstrip('/'))
+    else:
+        cors_origins.append(f"{frontend_url}/")
+
+# Para desarrollo/debugging, también permitir cualquier origen si FRONTEND_URL no está configurado
+# En producción, siempre debe estar configurado FRONTEND_URL
+if not frontend_url:
+    print("⚠️ WARNING: FRONTEND_URL no está configurado. CORS permitirá solo localhost.")
 
 app.add_middleware(
     CORSMiddleware,
