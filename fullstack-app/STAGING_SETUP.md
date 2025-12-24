@@ -4,7 +4,29 @@ Esta guía te ayudará a configurar un entorno de desarrollo local para poder pr
 
 ## Desarrollo Local (Recomendado)
 
-## Configuración Local
+### Inicio Rápido
+
+**Opción 1: Script Automático (Recomendado)**
+
+Desde PowerShell, en la raíz del proyecto (`fullstack-app/`):
+```powershell
+.\start_local.ps1
+```
+
+O desde CMD:
+```cmd
+start_local.bat
+```
+
+Este script automáticamente:
+- Crea los archivos `.env` si no existen
+- Crea el entorno virtual si no existe
+- Instala dependencias si faltan
+- Inicia backend y frontend en ventanas separadas
+
+---
+
+## Configuración Manual
 
 ### 1. Backend Local
 
@@ -56,8 +78,10 @@ Esta guía te ayudará a configurar un entorno de desarrollo local para poder pr
 6. **Iniciar el servidor:**
    ```bash
    python main.py
-   # O en Windows:
-   start_dev.bat
+   # O en Windows desde el directorio backend:
+   .\start_backend.bat
+   # O desde PowerShell:
+   .\start_backend.bat
    ```
    
    El backend estará disponible en: **http://localhost:8000**
