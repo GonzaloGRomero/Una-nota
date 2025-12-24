@@ -1761,9 +1761,18 @@ async def admin_get_room_info(room_name: str, data: AdminPasswordRequest):
     if not verify_admin_password(data.admin_password):
         raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
     
-    room_info = await room_manager.get_room_info(room_name)
+    # Normalizar el nombre de la sala
+    room_name_clean = room_name.strip().lower()
+    
+    room_info = await room_manager.get_room_info(room_name_clean)
     if not room_info:
-        raise HTTPException(status_code=404, detail="Sala no encontrada")
+        # Listar todas las salas disponibles para debug
+        async with room_manager._lock:
+            available_rooms = list(room_manager.rooms.keys())
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Sala no encontrada. Sala buscada: '{room_name_clean}'. Salas disponibles: {available_rooms}"
+        )
     
     return room_info
 
@@ -1805,7 +1814,7 @@ async def admin_close_room(data: CloseRoomRequest):
     success = await room_manager.close_room(room_name_clean)
     if success:
         return {"success": True, "message": f"Sala '{data.room_name}' cerrada exitosamente"}
-    raise HTTPException(status_code=404, detail="Sala no encontrada")
+    raise HTTPException(status_code=404, detail="Sala no encontradasdasda")
 
 
 @app.post("/admin/players/ban")
@@ -1814,7 +1823,10 @@ async def admin_ban_player(data: BanPlayerRequest):
     if not verify_admin_password(data.admin_password):
         raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
     
-    room_instance = await room_manager.get_room(data.room_name)
+    # Normalizar el nombre de la sala
+    room_name_clean = data.room_name.strip().lower()
+    
+    room_instance = await room_manager.get_room(room_name_clean)
     if not room_instance:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
     
@@ -1825,8 +1837,7 @@ async def admin_ban_player(data: BanPlayerRequest):
     
     await room_instance.remove_player(data.player_id)
     
-    # Desconectar el WebSocket del jugador
-    room_name_clean = data.room_name.strip().lower()
+    # Desconectar el WebSocket del jugador (ya está normalizado arriba)
     if room_name_clean in manager.rooms:
         for ws in manager.rooms[room_name_clean]:
             if manager.active.get(ws, {}).get("player_id") == data.player_id:
