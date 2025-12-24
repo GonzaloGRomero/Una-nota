@@ -465,10 +465,7 @@ export function Organizer({ roomName, password }: OrganizerProps) {
                           </div>
                           <button
                             className="select-track-button"
-                            onClick={() => {
-                              console.log('Select track clicked', { trackId: track.id, connected, gameState: gameState?.current_track_id });
-                              selectTrack(track.id);
-                            }}
+                            onClick={() => selectTrack(track.id)}
                             disabled={!connected || !gameState || gameState.current_track_id === track.id}
                           >
                             {gameState.current_track_id === track.id ? '▶ Reproduciendo' : '▶ Seleccionar'}
@@ -507,55 +504,37 @@ export function Organizer({ roomName, password }: OrganizerProps) {
             <h2>Controles de Reproducción</h2>
             <div className="controls-grid">
               <button 
-                onClick={() => {
-                  console.log('Play clicked', { connected, gameState: gameState?.status });
-                  control('play');
-                }} 
+                onClick={() => control('play')} 
                 disabled={!connected || !gameState || gameState.status === 'playing'}
               >
                 ▶️ Play
               </button>
               <button 
-                onClick={() => {
-                  console.log('Pause clicked', { connected, gameState: gameState?.status });
-                  control('pause');
-                }} 
+                onClick={() => control('pause')} 
                 disabled={!connected || !gameState || gameState.status === 'paused'}
               >
                 ⏸️ Pausa
               </button>
               <button 
-                onClick={() => {
-                  console.log('Stop clicked', { connected, gameState: gameState?.status });
-                  control('stop');
-                }} 
+                onClick={() => control('stop')} 
                 disabled={!connected || !gameState || gameState.status === 'stopped'}
               >
                 ⏹️ Stop
               </button>
               <button 
-                onClick={() => {
-                  console.log('Preview 2s clicked', { connected, gameState: gameState?.status });
-                  control('preview2');
-                }}
+                onClick={() => control('preview2')}
                 disabled={!connected || !gameState}
               >
                 ⏩ Preview 2s
               </button>
               <button 
-                onClick={() => {
-                  console.log('Preview 5s clicked', { connected, gameState: gameState?.status });
-                  control('preview5');
-                }}
+                onClick={() => control('preview5')}
                 disabled={!connected || !gameState}
               >
                 ⏩⏩ Preview 5s
               </button>
               <button 
-                onClick={() => {
-                  console.log('Next track clicked', { connected, gameState: gameState?.status });
-                  nextTrack();
-                }}
+                onClick={() => nextTrack()}
                 disabled={!connected || !gameState}
               >
                 ⏭️ Siguiente Canción

@@ -111,8 +111,8 @@ load_youtube_tokens()
 # Configuración OAuth2 de Google/YouTube
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://juego-en-una-nota-production.up.railway.app/auth/youtube/callback")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://una-nota-two.vercel.app")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "")
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
@@ -600,15 +600,12 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
-            print(f"[DEBUG] Mensaje recibido - tipo: {msg_type}, data keys: {list(data.keys())}")
             if msg_type == "join":
                 try:
                     name = data.get("name", "Jugador")
                     role = data.get("role", "player")
                     room_name_param = data.get("room_name")
                     password = data.get("password", "")
-                    
-                    print(f"[DEBUG] Received join: name={name}, role={role}, room_name={room_name_param}")
                     
                     # Validar sala y contraseña
                     if not room_name_param:
@@ -632,29 +629,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     if role == "player":
                         active_ids = manager.get_active_player_ids(room_name)
-                        print(f"[DEBUG] Active player IDs in room {room_name}: {active_ids}")
                         player, is_reused = await current_room.add_player(name, active_ids)
-                        print(f"[DEBUG] Player created/reused: {player.id if player else None}, is_reused={is_reused}")
                         if player is None:
                             # Nombre en uso por conexión activa
-                            print(f"[DEBUG] Player name '{name}' already in use by active connection")
                             await websocket.send_json({
                                 "type": "join_error",
                                 "payload": {"message": "Este nombre ya está en uso por un jugador conectado. Por favor elige otro nombre."}
                             })
                         else:
                             manager.set_identity(websocket, player.id, role, room_name)
-                            print(f"[DEBUG] Set identity: player_id={player.id}, role={role}, room={room_name}")
                             if is_reused:
                                 # Si se reutilizó, notificar que el jugador volvió
                                 await manager.broadcast({"type": "player_rejoin", "payload": player.model_dump()}, room_name)
                             else:
                                 # Si es nuevo, notificar normalmente
                                 await manager.broadcast({"type": "player_join", "payload": player.model_dump()}, room_name)
-                            print(f"[DEBUG] Sending join_ack for player {player.id}")
                             await websocket.send_json({"type": "join_ack", "payload": {"playerId": player.id, "isReused": is_reused}})
                             await websocket.send_json(build_state_message(current_room))
-                            print(f"[DEBUG] Join completed successfully for player {player.id}")
                     else:
                         manager.set_identity(websocket, None, role, room_name)
                         await websocket.send_json({"type": "join_ack", "payload": {"playerId": None}})
@@ -669,26 +660,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
             else:
                 # Para otros mensajes, obtener la sala de la conexión
-                print(f"[DEBUG] Mensaje NO es 'join', tipo: {msg_type}, current_room existe: {current_room is not None}, room_name: {room_name}")
                 if not current_room:
                     room_name_from_ws = manager.active.get(websocket, {}).get("room_name")
-                    print(f"[DEBUG] No hay current_room, buscando desde WS: room_name={room_name_from_ws}")
                     if room_name_from_ws:
                         current_room = await room_manager.get_room(room_name_from_ws)
                         room_name = room_name_from_ws
-                        print(f"[DEBUG] Room obtenida desde WS: {current_room is not None}")
                 
                 if not current_room:
-                    print(f"[DEBUG] ERROR: No hay current_room para procesar mensaje tipo: {msg_type}")
                     await websocket.send_json({
                         "type": "error",
                         "payload": {"message": "Debes unirte a una sala primero"}
                     })
                     continue
-                
-                print(f"\n{'='*60}")
-                print(f"[DEBUG] Procesando mensaje tipo: {msg_type}, room_name: {room_name}, current_room existe: {current_room is not None}")
-                print(f"{'='*60}")
                 
                 if msg_type == "buzz":
                     player_id = data.get("playerId")
@@ -698,7 +681,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
                 elif msg_type == "control":
                     action = data.get("action")
-                    print(f"[DEBUG] Control action recibida: {action}")
                     if action in {"play", "pause", "stop", "preview2", "preview5"}:
                         status_map = {
                             "play": "playing",
@@ -708,13 +690,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             "preview5": "preview5",
                         }
                         new_status = status_map[action]
-                        print(f"[DEBUG] Cambiando status a: {new_status}")
                         await current_room.set_status(new_status)
-                        print(f"[DEBUG] Status después de set_status: {current_room.status}")
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
-                        print(f"[DEBUG] Broadcast enviado con status: {current_room.status}")
-                    else:
-                        print(f"[DEBUG] Action inválida: {action}")
                 elif msg_type == "set_winner":
                     player_id = data.get("playerId")
                     winner = await current_room.set_winner(player_id)
@@ -751,29 +728,20 @@ async def websocket_endpoint(websocket: WebSocket):
                         await manager.broadcast({"type": "scores", "payload": {"players": {pid: p.model_dump() for pid, p in current_room.players.items()}}}, room_name)
                         await manager.broadcast({"type": "point_awarded", "payload": {"playerId": player_id, "playerName": adjusted_player.name, "points": points, "track": track_info}}, room_name)
                 elif msg_type == "next_track":
-                    print(f"[DEBUG] next_track recibido, current_track_id antes: {current_room.current_track_id}")
                     await current_room.next_track()
-                    print(f"[DEBUG] next_track ejecutado, current_track_id después: {current_room.current_track_id}, status: {current_room.status}")
                     await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
                     await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
-                    print(f"[DEBUG] Broadcasts enviados para next_track")
                 elif msg_type == "select_track":
                     track_id = data.get("trackId")
-                    print(f"[DEBUG] select_track recibido, track_id: {track_id}")
                     if track_id:
                         async with current_room._lock:
                             track_exists = any(t.id == track_id for t in current_room.tracks)
-                            print(f"[DEBUG] Track existe: {track_exists}, total tracks: {len(current_room.tracks)}")
                             if track_exists:
                                 current_room.current_track_id = track_id
                                 current_room.status = "stopped"
                                 current_room.buzz_queue = []
-                                print(f"[DEBUG] Track seleccionado, current_track_id: {current_room.current_track_id}, status: {current_room.status}")
                         await manager.broadcast({"type": "track_changed", "payload": {"currentTrackId": current_room.current_track_id}}, room_name)
                         await manager.broadcast({"type": "control", "payload": {"status": current_room.status}}, room_name)
-                        print(f"[DEBUG] Broadcasts enviados para select_track")
-                    else:
-                        print(f"[DEBUG] select_track: track_id es None o vacío")
                 elif msg_type == "remove_player":
                     player_id_to_remove = data.get("playerId")
                     if player_id_to_remove:
@@ -910,8 +878,8 @@ def extract_playlist_id(playlist_url: str) -> Optional[str]:
 
 def get_spotify_client():
     """Obtiene un cliente de Spotify usando credenciales de entorno"""
-    client_id = os.getenv("SPOTIFY_CLIENT_ID", "5e3d0a02068b4d5bb56975d3d5577a74")
-    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "d638749b26f94b73999441e79d5e6578")
+    client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "")
     
     if not client_id or not client_secret:
         raise HTTPException(
@@ -1001,9 +969,7 @@ def import_youtube_playlist(playlist_url: str) -> tuple[List[Track], str, int]:
         cookies_path = get_youtube_cookies_path()
         if cookies_path:
             ydl_opts['cookiefile'] = cookies_path
-            print(f"DEBUG: Usando cookies de YouTube desde: {cookies_path}")
         else:
-            print("DEBUG: Usando yt-dlp sin cookies (puede ser más propenso a bloqueos)")
         
         full_url = f"https://www.youtube.com/playlist?list={playlist_id}"
         
@@ -1037,7 +1003,6 @@ def import_youtube_playlist(playlist_url: str) -> tuple[List[Track], str, int]:
             
             import time
             
-            print(f"DEBUG: Procesando {len(entries)} videos de la playlist '{playlist_name}'")
             
             for idx, entry in enumerate(entries):
                 if not entry:
@@ -1189,16 +1154,12 @@ async def import_playlist(playlist_data: PlaylistImport):
         # Esto asegura que incluso si el frontend envía un source incorrecto, se detecte correctamente
         if "youtube.com" in playlist_url or "music.youtube.com" in playlist_url or "youtu.be" in playlist_url:
             source = "youtube"
-            print(f"DEBUG: Detectado YouTube desde URL: {playlist_url}")
         elif "spotify.com" in playlist_url or "open.spotify.com" in playlist_url:
             source = "spotify"
-            print(f"DEBUG: Detectado Spotify desde URL: {playlist_url}")
         elif not source:
             # Si no se puede detectar y no hay source, asumir Spotify por defecto
             source = "spotify"
-            print(f"DEBUG: No se pudo detectar fuente, usando Spotify por defecto: {playlist_url}")
         
-        print(f"DEBUG: Source final: {source}, URL: {playlist_url}")
         
         # Importar desde YouTube Music
         if source == "youtube":
@@ -1793,8 +1754,6 @@ async def admin_close_room(data: CloseRoomRequest):
     # Debug: Listar todas las salas disponibles
     async with room_manager._lock:
         available_rooms = list(room_manager.rooms.keys())
-        print(f"[DEBUG] Intentando cerrar sala: '{room_name_clean}'")
-        print(f"[DEBUG] Salas disponibles: {available_rooms}")
     
     # Verificar que la sala existe y obtener la instancia
     room_instance = await room_manager.get_room(room_name_clean)

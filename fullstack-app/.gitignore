@@ -63,3 +63,7 @@ logs/
 # OS
 Thumbs.db
 desktop.ini
+
+# Desarrollo local (scripts de desarrollo)
+start_dev.bat
+backend/start.bat
