@@ -1755,28 +1755,6 @@ async def admin_list_rooms(data: AdminPasswordRequest):
     return {"rooms": rooms, "total": len(rooms)}
 
 
-@app.post("/admin/rooms/{room_name}")
-async def admin_get_room_info(room_name: str, data: AdminPasswordRequest):
-    """Obtiene información detallada de una sala (requiere contraseña de admin)"""
-    if not verify_admin_password(data.admin_password):
-        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
-    
-    # Normalizar el nombre de la sala
-    room_name_clean = room_name.strip().lower()
-    
-    room_info = await room_manager.get_room_info(room_name_clean)
-    if not room_info:
-        # Listar todas las salas disponibles para debug
-        async with room_manager._lock:
-            available_rooms = list(room_manager.rooms.keys())
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Sala no encontrada. Sala buscada: '{room_name_clean}'. Salas disponibles: {available_rooms}"
-        )
-    
-    return room_info
-
-
 @app.post("/admin/rooms/close")
 async def admin_close_room(data: CloseRoomRequest):
     """Cierra y elimina una sala (requiere contraseña de admin)"""
@@ -1814,7 +1792,29 @@ async def admin_close_room(data: CloseRoomRequest):
     success = await room_manager.close_room(room_name_clean)
     if success:
         return {"success": True, "message": f"Sala '{data.room_name}' cerrada exitosamente"}
-    raise HTTPException(status_code=404, detail="Sala no encontradasdasda")
+    raise HTTPException(status_code=404, detail="Sala no encontrada")
+
+
+@app.post("/admin/rooms/{room_name}")
+async def admin_get_room_info(room_name: str, data: AdminPasswordRequest):
+    """Obtiene información detallada de una sala (requiere contraseña de admin)"""
+    if not verify_admin_password(data.admin_password):
+        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
+    
+    # Normalizar el nombre de la sala
+    room_name_clean = room_name.strip().lower()
+    
+    room_info = await room_manager.get_room_info(room_name_clean)
+    if not room_info:
+        # Listar todas las salas disponibles para debug
+        async with room_manager._lock:
+            available_rooms = list(room_manager.rooms.keys())
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Sala no encontrada. Sala buscada: '{room_name_clean}'. Salas disponibles: {available_rooms}"
+        )
+    
+    return room_info
 
 
 @app.post("/admin/players/ban")
