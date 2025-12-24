@@ -600,6 +600,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
+            print(f"[DEBUG] Mensaje recibido - tipo: {msg_type}, data keys: {list(data.keys())}")
             if msg_type == "join":
                 try:
                     name = data.get("name", "Jugador")
@@ -668,6 +669,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
             else:
                 # Para otros mensajes, obtener la sala de la conexión
+                print(f"[DEBUG] Mensaje NO es 'join', tipo: {msg_type}, current_room existe: {current_room is not None}, room_name: {room_name}")
                 if not current_room:
                     room_name_from_ws = manager.active.get(websocket, {}).get("room_name")
                     print(f"[DEBUG] No hay current_room, buscando desde WS: room_name={room_name_from_ws}")
