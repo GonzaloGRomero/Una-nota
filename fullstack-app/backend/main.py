@@ -24,14 +24,18 @@ from google.auth.transport.requests import Request as GoogleRequest
 
 app = FastAPI(title="Music Buzzer API", version="1.0.0")
 
+# Configurar CORS - Filtrar valores vacíos
+frontend_url = os.getenv("FRONTEND_URL", "").strip()
+cors_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+if frontend_url:
+    cors_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://una-nota-two.vercel.app",
-        os.getenv("FRONTEND_URL", ""),
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
