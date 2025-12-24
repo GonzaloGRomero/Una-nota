@@ -63,9 +63,12 @@ export function useGameSocket() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log('[WebSocket] Conexión abierta, enviando join...');
       setConnected(true);
       isConnectingRef.current = false;
-      ws.send(JSON.stringify({ type: 'join', name, role, room_name: roomName, password: password }));
+      const joinMessage = { type: 'join', name, role, room_name: roomName, password: password };
+      console.log('[WebSocket] Enviando join:', joinMessage);
+      ws.send(JSON.stringify(joinMessage));
     };
 
     ws.onmessage = (event) => {
@@ -187,13 +190,15 @@ export function useGameSocket() {
   }, []);
 
   const sendMessage = useCallback((message: any) => {
+    console.log('[WebSocket] sendMessage llamado:', message, 'readyState:', wsRef.current?.readyState, 'OPEN:', WebSocket.OPEN);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       console.log('[WebSocket] Enviando mensaje:', message);
       wsRef.current.send(JSON.stringify(message));
     } else {
-      console.warn('[WebSocket] No se puede enviar mensaje, WebSocket no está abierto. ReadyState:', wsRef.current?.readyState);
+      console.warn('[WebSocket] No se puede enviar mensaje, WebSocket no está abierto. ReadyState:', wsRef.current?.readyState, 'Esperado:', WebSocket.OPEN);
+      console.warn('[WebSocket] wsRef.current existe:', wsRef.current !== null, 'connected state:', connected);
     }
-  }, []);
+  }, [connected]);
 
   const buzz = useCallback(() => {
     if (playerId) {
