@@ -684,7 +684,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
                     continue
                 
+                print(f"\n{'='*60}")
                 print(f"[DEBUG] Procesando mensaje tipo: {msg_type}, room_name: {room_name}, current_room existe: {current_room is not None}")
+                print(f"{'='*60}")
                 
                 if msg_type == "buzz":
                     player_id = data.get("playerId")
