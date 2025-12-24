@@ -1343,6 +1343,12 @@ async def youtube_authorize():
             detail="Google OAuth2 no está configurado. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET."
         )
     
+    if not GOOGLE_REDIRECT_URI:
+        raise HTTPException(
+            status_code=500,
+            detail="GOOGLE_REDIRECT_URI no está configurado. Configura esta variable de entorno con la URL completa del callback (ej: https://tu-backend.railway.app/auth/youtube/callback)"
+        )
+    
     flow = Flow.from_client_config(
         {
             "web": {
@@ -1372,6 +1378,12 @@ async def youtube_callback(code: str, state: Optional[str] = None):
     """Callback de OAuth2 de Google/YouTube"""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth2 no está configurado.")
+    
+    if not GOOGLE_REDIRECT_URI:
+        error_msg = "GOOGLE_REDIRECT_URI no está configurado."
+        if FRONTEND_URL:
+            return RedirectResponse(url=f"{FRONTEND_URL}/?youtube_auth=error&message={error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
     
     try:
         flow = Flow.from_client_config(
