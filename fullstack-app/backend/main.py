@@ -120,10 +120,6 @@ SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 ADMIN_PASSWORD_PLAIN = os.getenv("ADMIN_PASSWORD", "admin123")  # Solo para desarrollo, cambiar en producción
 
-# Si no hay hash configurado, generar uno desde la contraseña en texto plano (solo desarrollo)
-if not ADMIN_PASSWORD_HASH and ADMIN_PASSWORD_PLAIN:
-    ADMIN_PASSWORD_HASH = bcrypt.hashpw(ADMIN_PASSWORD_PLAIN.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
 
 class Track(BaseModel):
     id: str
@@ -1726,12 +1722,15 @@ async def check_room(room_name: str):
 
 def verify_admin_password(password: str) -> bool:
     """Verifica la contraseña de administrador"""
-    if not ADMIN_PASSWORD_HASH:
-        return False
-    try:
-        return bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8'))
-    except:
-        return False
+    # Si hay hash configurado, usar verificación segura con bcrypt
+    if ADMIN_PASSWORD_HASH:
+        try:
+            return bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8'))
+        except:
+            return False
+    # Si no hay hash configurado, comparar directamente (solo desarrollo)
+    # En producción siempre debe usarse ADMIN_PASSWORD_HASH
+    return password == ADMIN_PASSWORD_PLAIN
 
 
 @app.post("/admin/auth")
