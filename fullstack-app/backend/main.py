@@ -1777,12 +1777,15 @@ async def admin_close_room(data: CloseRoomRequest):
     # Normalizar el nombre de la sala
     room_name_clean = data.room_name.strip().lower()
     
+    # Debug: Listar todas las salas disponibles
+    async with room_manager._lock:
+        available_rooms = list(room_manager.rooms.keys())
+        print(f"[DEBUG] Intentando cerrar sala: '{room_name_clean}'")
+        print(f"[DEBUG] Salas disponibles: {available_rooms}")
+    
     # Verificar que la sala existe y obtener la instancia
     room_instance = await room_manager.get_room(room_name_clean)
     if not room_instance:
-        # Listar todas las salas disponibles para debug
-        async with room_manager._lock:
-            available_rooms = list(room_manager.rooms.keys())
         raise HTTPException(
             status_code=404, 
             detail=f"Sala no encontrada. Sala buscada: '{room_name_clean}'. Salas disponibles: {available_rooms}"

@@ -119,6 +119,7 @@ export function Admin() {
         alert(`Sala "${roomName}" cerrada exitosamente`);
       } else {
         const error = await response.json();
+        console.error('Error cerrando sala:', error);
         alert(`Error: ${error.detail || 'No se pudo cerrar la sala'}`);
       }
     } catch (error) {
