@@ -188,7 +188,10 @@ export function useGameSocket() {
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocket] Enviando mensaje:', message);
       wsRef.current.send(JSON.stringify(message));
+    } else {
+      console.warn('[WebSocket] No se puede enviar mensaje, WebSocket no está abierto. ReadyState:', wsRef.current?.readyState);
     }
   }, []);
 
