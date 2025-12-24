@@ -1365,18 +1365,25 @@ async def import_playlist(playlist_data: PlaylistImport):
 async def youtube_authorize():
     """Inicia el flujo OAuth2 de Google/YouTube"""
     try:
+        print(f"[DEBUG] youtube_authorize llamado. GOOGLE_CLIENT_ID existe: {bool(GOOGLE_CLIENT_ID)}, GOOGLE_CLIENT_SECRET existe: {bool(GOOGLE_CLIENT_SECRET)}, GOOGLE_REDIRECT_URI: {GOOGLE_REDIRECT_URI[:50] if GOOGLE_REDIRECT_URI else 'NO CONFIGURADO'}")
+        
         if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            error_msg = "Google OAuth2 no está configurado. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET."
+            print(f"[ERROR] {error_msg}")
             raise HTTPException(
                 status_code=500,
-                detail="Google OAuth2 no está configurado. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET."
+                detail=error_msg
             )
         
         if not GOOGLE_REDIRECT_URI:
+            error_msg = "GOOGLE_REDIRECT_URI no está configurado. Configura esta variable de entorno con la URL completa del callback (ej: https://tu-backend.railway.app/auth/youtube/callback)"
+            print(f"[ERROR] {error_msg}")
             raise HTTPException(
                 status_code=500,
-                detail="GOOGLE_REDIRECT_URI no está configurado. Configura esta variable de entorno con la URL completa del callback (ej: https://tu-backend.railway.app/auth/youtube/callback)"
+                detail=error_msg
             )
         
+        print(f"[DEBUG] Creando Flow con redirect_uri: {GOOGLE_REDIRECT_URI}")
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -1391,18 +1398,22 @@ async def youtube_authorize():
             redirect_uri=GOOGLE_REDIRECT_URI
         )
         
+        print(f"[DEBUG] Generando authorization_url...")
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
             prompt='consent'
         )
         
+        print(f"[DEBUG] authorization_url generado exitosamente")
         # Guardar el state para verificación (en producción usar sesiones)
         return {"authorization_url": authorization_url, "state": state}
-    except HTTPException:
+    except HTTPException as he:
+        print(f"[ERROR] HTTPException en youtube_authorize: {he.detail}")
         raise
     except Exception as e:
-        print(f"[ERROR] Error en youtube_authorize: {str(e)}")
+        error_msg = f"Error en youtube_authorize: {str(e)}"
+        print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
         raise HTTPException(
