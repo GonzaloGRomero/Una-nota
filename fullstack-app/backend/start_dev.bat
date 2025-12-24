@@ -17,3 +17,4 @@ if not exist .env (
 REM Iniciar servidor
 python main.py
 pause
+

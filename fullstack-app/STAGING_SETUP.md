@@ -1,132 +1,136 @@
-# Configuración de Entorno de Staging/Desarrollo
+# Configuración de Entorno de Desarrollo Local
 
-Esta guía te ayudará a configurar un entorno de prueba separado de producción para poder probar cambios antes de hacer merge a `master`.
+Esta guía te ayudará a configurar un entorno de desarrollo local para poder probar cambios antes de subir a producción en la nube.
 
-## Opción 1: Entorno de Staging en Railway y Vercel (Recomendado)
+## Desarrollo Local (Recomendado)
 
-### Backend (Railway)
+## Configuración Local
 
-1. **Crear un nuevo proyecto en Railway:**
-   - Ve a https://railway.app/
-   - Click en "New Project"
-   - Selecciona "Deploy from GitHub repo"
-   - Selecciona tu repositorio
-   - **Importante:** En "Settings" → "Source", cambia la branch a `develop` (o la branch que quieras usar para staging)
+### 1. Backend Local
 
-2. **Configurar variables de entorno:**
-   - Ve a "Variables" en el proyecto de staging
-   - Agrega las mismas variables que en producción:
-     ```
-     GOOGLE_CLIENT_ID=tu_client_id
-     GOOGLE_CLIENT_SECRET=tu_client_secret
-     GOOGLE_REDIRECT_URI=https://tu-backend-staging.up.railway.app/auth/youtube/callback
-     FRONTEND_URL=https://tu-frontend-staging.vercel.app
-     ```
-   - **Nota:** Usa URLs diferentes para staging
-
-3. **Configurar Root Directory:**
-   - En "Settings" → "Root Directory", establece: `fullstack-app/backend`
-
-4. **Obtener la URL del backend de staging:**
-   - Ve a "Settings" → "Domains"
-   - Copia la URL pública (ej: `tu-proyecto-staging.up.railway.app`)
-
-### Frontend (Vercel)
-
-1. **Crear un nuevo proyecto en Vercel:**
-   - Ve a https://vercel.com/
-   - Click en "Add New..." → "Project"
-   - Importa tu repositorio de GitHub
-   - **Importante:** En "Configure Project", cambia la branch a `develop`
-
-2. **Configurar variables de entorno:**
-   - Ve a "Settings" → "Environment Variables"
-   - Agrega:
-     ```
-     REACT_APP_API_URL=https://tu-backend-staging.up.railway.app
-     REACT_APP_WS_URL=wss://tu-backend-staging.up.railway.app/ws/sala
-     ```
-   - **Nota:** Usa `wss://` (WebSocket seguro) si Railway usa HTTPS
-
-3. **Configurar Root Directory:**
-   - En "Settings" → "General" → "Root Directory", establece: `fullstack-app/frontend`
-
-4. **Obtener la URL del frontend de staging:**
-   - Después del deploy, Vercel te dará una URL (ej: `tu-proyecto-staging.vercel.app`)
-
-### Actualizar URLs en Google Cloud Console
-
-1. Ve a https://console.cloud.google.com/
-2. Ve a "APIs & Services" → "Credentials"
-3. Click en tu OAuth Client ID
-4. En "Authorized redirect URIs", agrega:
-   ```
-   https://tu-backend-staging.up.railway.app/auth/youtube/callback
-   ```
-
----
-
-## Opción 2: Desarrollo Local con Variables de Entorno
-
-### Backend Local
-
-1. **Crear archivo `.env` en `backend/`:**
-   ```env
-   GOOGLE_CLIENT_ID=tu_client_id
-   GOOGLE_CLIENT_SECRET=tu_client_secret
-   GOOGLE_REDIRECT_URI=http://localhost:8000/auth/youtube/callback
-   FRONTEND_URL=http://localhost:3000
-   PORT=8000
-   ```
-
-2. **Instalar dependencias:**
+1. **Navegar al directorio del backend:**
    ```bash
-   cd backend
+   cd fullstack-app/backend
+   ```
+
+2. **Crear entorno virtual (si no existe):**
+   ```bash
    python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
+   ```
+
+3. **Activar entorno virtual:**
+   ```bash
+   # Windows:
+   venv\Scripts\activate
+   
+   # Linux/Mac:
+   source venv/bin/activate
+   ```
+
+4. **Instalar dependencias:**
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Ejecutar:**
+5. **Configurar variables de entorno:**
+   - Copia el archivo de ejemplo:
+     ```bash
+     # Windows:
+     copy .env.example .env
+     
+     # Linux/Mac:
+     cp .env.example .env
+     ```
+   - Edita el archivo `.env` y agrega tus credenciales (opcional):
+     ```env
+     GOOGLE_CLIENT_ID=tu_client_id
+     GOOGLE_CLIENT_SECRET=tu_client_secret
+     GOOGLE_REDIRECT_URI=http://localhost:8000/auth/youtube/callback
+     FRONTEND_URL=http://localhost:3000
+     PORT=8000
+     SPOTIFY_CLIENT_ID=tu_client_id
+     SPOTIFY_CLIENT_SECRET=tu_client_secret
+     ```
+   - **Nota:** Si no tienes credenciales, el backend funcionará pero sin importar playlists de Spotify/YouTube
+
+6. **Iniciar el servidor:**
    ```bash
    python main.py
+   # O en Windows:
+   start_dev.bat
    ```
+   
+   El backend estará disponible en: **http://localhost:8000**
 
-### Frontend Local
+### 2. Frontend Local
 
-1. **Crear archivo `.env` en `frontend/`:**
-   ```env
-   REACT_APP_API_URL=http://localhost:8000
-   REACT_APP_WS_URL=ws://localhost:8000/ws/sala
-   PORT=3000
-   ```
-
-2. **Instalar dependencias:**
+1. **Abrir una nueva terminal y navegar al directorio del frontend:**
    ```bash
-   cd frontend
+   cd fullstack-app/frontend
+   ```
+
+2. **Instalar dependencias (solo la primera vez):**
+   ```bash
    npm install
    ```
 
-3. **Ejecutar:**
+3. **Configurar variables de entorno:**
+   - Copia el archivo de ejemplo:
+     ```bash
+     # Windows:
+     copy .env.example .env
+     
+     # Linux/Mac:
+     cp .env.example .env
+     ```
+   - El archivo `.env.example` ya tiene las URLs correctas para desarrollo local:
+     ```env
+     REACT_APP_API_URL=http://localhost:8000
+     REACT_APP_WS_URL=ws://localhost:8000/ws/sala
+     PORT=3000
+     ```
+   - **No necesitas modificar nada** a menos que quieras usar un backend remoto
+
+4. **Iniciar el servidor de desarrollo:**
    ```bash
    npm start
    ```
+   
+   El frontend estará disponible en: **http://localhost:3000**
+
+---
+
+## Verificar que Todo Funciona
+
+1. **Backend:** Abre http://localhost:8000 en tu navegador
+   - Deberías ver: `{"message":"Music buzzer backend activo",...}`
+
+2. **Frontend:** Abre http://localhost:3000
+   - Deberías ver la pantalla de inicio con opciones para crear/unirse a salas
+
+3. **Probar conexión:**
+   - Crea una sala desde el frontend
+   - Verifica que puedas conectarte como organizador y jugador
 
 ---
 
 ## Flujo de Trabajo Recomendado
 
-1. **Desarrollo:**
+1. **Desarrollo Local:**
    - Trabaja en la branch `develop` (o crea branches feature desde `develop`)
-   - Haz commits y push a `develop`
-   - Railway y Vercel staging se actualizarán automáticamente
+   - Inicia backend y frontend localmente
+   - Prueba todos los cambios localmente
+   - Haz commits en `develop`
 
-2. **Testing:**
-   - Prueba en el entorno de staging
+2. **Testing Local:**
+   - Prueba todas las funcionalidades
    - Verifica que todo funcione correctamente
+   - Crea salas, importa playlists, prueba con jugadores
 
-3. **Producción:**
-   - Cuando estés listo, haz merge de `develop` a `master`
+3. **Subir a Producción:**
+   - Cuando estés satisfecho con los cambios locales
+   - Haz merge de `develop` a `master`
+   - Push a `master`
    - Railway y Vercel producción se actualizarán automáticamente
 
 ---
@@ -154,24 +158,59 @@ git push origin master
 
 ## Notas Importantes
 
-- **Staging y Producción son completamente independientes:** Cada uno tiene su propia base de datos, salas, y estado
-- **Las contraseñas de salas en staging no afectan producción:** Son entornos separados
-- **Los tokens de YouTube OAuth:** Puedes usar la misma cuenta, pero necesitas agregar ambas URLs de callback en Google Cloud Console
-- **Costos:** Railway y Vercel tienen planes gratuitos generosos, pero verifica los límites
+- **Desarrollo Local es completamente independiente de Producción:** Tu entorno local no afecta la producción en la nube
+- **Hot Reload:** Ambos servidores (backend y frontend) tienen hot reload, los cambios se reflejan automáticamente
+- **Sin necesidad de redeploy:** Puedes probar cambios instantáneamente sin esperar deploys
+- **Los archivos `.env` no se suben al repositorio:** Están en `.gitignore` para mantener tus credenciales seguras
+- **Tokens de YouTube OAuth:** Para desarrollo local, usa `http://localhost:8000/auth/youtube/callback` (ya está en el .env.example)
 
 ---
 
 ## Troubleshooting
 
-### El frontend no se conecta al backend de staging
-- Verifica que `REACT_APP_API_URL` y `REACT_APP_WS_URL` apunten a la URL correcta de staging
-- Verifica que el backend de staging esté corriendo
-- Revisa los logs de Railway para errores
+### El frontend no se conecta al backend
+- **Verifica que el backend esté corriendo:** Debe estar en http://localhost:8000
+- **Verifica las variables de entorno:** Asegúrate de que `.env` en frontend tenga:
+  ```
+  REACT_APP_API_URL=http://localhost:8000
+  REACT_APP_WS_URL=ws://localhost:8000/ws/sala
+  ```
+- **Reinicia el frontend:** A veces necesita reiniciarse para cargar nuevas variables de entorno
 
 ### Error de CORS
-- Verifica que `FRONTEND_URL` en el backend incluya la URL de staging de Vercel
-- Verifica que `allow_origins` en `main.py` incluya la URL de staging
+- **Verifica que el backend tenga:** `FRONTEND_URL=http://localhost:3000` en su `.env`
+- **Verifica que el backend esté corriendo:** El CORS se configura al iniciar
 
 ### WebSocket no conecta
-- Verifica que uses `wss://` (no `ws://`) si Railway usa HTTPS
-- Verifica que el endpoint `/ws/sala` esté accesible
+- **Verifica que uses `ws://` (no `wss://`) para localhost**
+- **Verifica que el backend esté corriendo** en el puerto 8000
+- **Revisa la consola del navegador** para ver errores específicos
+
+### Puerto 8000 ya en uso
+```bash
+# Windows: Encontrar y matar proceso
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# O cambiar el puerto en backend/.env
+PORT=8001
+# Y actualizar frontend/.env
+REACT_APP_API_URL=http://localhost:8001
+REACT_APP_WS_URL=ws://localhost:8001/ws/sala
+```
+
+### Puerto 3000 ya en uso
+- El frontend te preguntará si quieres usar otro puerto
+- O cambia en `frontend/.env`: `PORT=3001`
+
+### Módulos no encontrados
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+
+# Frontend
+cd frontend
+npm install
+```
+
