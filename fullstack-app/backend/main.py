@@ -1468,7 +1468,7 @@ async def youtube_auth_status():
                 # Intentar refrescar el token
                 if credentials.refresh_token:
                     try:
-                        credentials.refresh(Request())
+                        credentials.refresh(GoogleRequest())
                         save_youtube_tokens()
                         return {"authenticated": True, "message": "Autenticado con YouTube (token refrescado)"}
                     except:
