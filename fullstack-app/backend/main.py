@@ -1337,40 +1337,51 @@ async def import_playlist(playlist_data: PlaylistImport):
 @app.get("/auth/youtube/authorize")
 async def youtube_authorize():
     """Inicia el flujo OAuth2 de Google/YouTube"""
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    try:
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            raise HTTPException(
+                status_code=500,
+                detail="Google OAuth2 no está configurado. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET."
+            )
+        
+        if not GOOGLE_REDIRECT_URI:
+            raise HTTPException(
+                status_code=500,
+                detail="GOOGLE_REDIRECT_URI no está configurado. Configura esta variable de entorno con la URL completa del callback (ej: https://tu-backend.railway.app/auth/youtube/callback)"
+            )
+        
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [GOOGLE_REDIRECT_URI],
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=GOOGLE_REDIRECT_URI
+        )
+        
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        
+        # Guardar el state para verificación (en producción usar sesiones)
+        return {"authorization_url": authorization_url, "state": state}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error en youtube_authorize: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail="Google OAuth2 no está configurado. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET."
+            detail=f"Error al iniciar autorización de YouTube: {str(e)}"
         )
-    
-    if not GOOGLE_REDIRECT_URI:
-        raise HTTPException(
-            status_code=500,
-            detail="GOOGLE_REDIRECT_URI no está configurado. Configura esta variable de entorno con la URL completa del callback (ej: https://tu-backend.railway.app/auth/youtube/callback)"
-        )
-    
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [GOOGLE_REDIRECT_URI],
-            }
-        },
-        scopes=SCOPES,
-        redirect_uri=GOOGLE_REDIRECT_URI
-    )
-    
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent'
-    )
-    
-    # Guardar el state para verificación (en producción usar sesiones)
-    return {"authorization_url": authorization_url, "state": state}
 
 
 @app.get("/auth/youtube/callback")
