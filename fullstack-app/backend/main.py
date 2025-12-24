@@ -975,7 +975,7 @@ def import_youtube_playlist(playlist_url: str) -> tuple[List[Track], str, int]:
             ydl_opts['cookiefile'] = cookies_path
         else:
         
-        full_url = f"https://www.youtube.com/playlist?list={playlist_id}"
+            full_url = f"https://www.youtube.com/playlist?list={playlist_id}"
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
