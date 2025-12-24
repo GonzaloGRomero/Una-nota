@@ -116,6 +116,14 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://una-nota-two.vercel.app")
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
 
+# Contraseña de administrador (hasheada)
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
+ADMIN_PASSWORD_PLAIN = os.getenv("ADMIN_PASSWORD", "admin123")  # Solo para desarrollo, cambiar en producción
+
+# Si no hay hash configurado, generar uno desde la contraseña en texto plano (solo desarrollo)
+if not ADMIN_PASSWORD_HASH and ADMIN_PASSWORD_PLAIN:
+    ADMIN_PASSWORD_HASH = bcrypt.hashpw(ADMIN_PASSWORD_PLAIN.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
 
 class Track(BaseModel):
     id: str
@@ -156,6 +164,21 @@ class CreateRoomRequest(BaseModel):
 class JoinRoomRequest(BaseModel):
     room_name: str
     password: str
+
+
+class AdminAuthRequest(BaseModel):
+    password: str
+
+
+class CloseRoomRequest(BaseModel):
+    room_name: str
+    admin_password: str
+
+
+class BanPlayerRequest(BaseModel):
+    room_name: str
+    player_id: str
+    admin_password: str
 
 
 TRACKS: List[Track] = [
@@ -442,6 +465,54 @@ class RoomManager:
             if room_name_clean in self.rooms:
                 return self.rooms[room_name_clean]['room']
             return None
+    
+    async def list_rooms(self) -> List[Dict]:
+        """Lista todas las salas activas con información"""
+        async with self._lock:
+            rooms_info = []
+            for room_name, room_data in self.rooms.items():
+                room_instance = room_data['room']
+                created_at = room_data.get('created_at', datetime.now())
+                rooms_info.append({
+                    'name': room_name,
+                    'created_at': created_at.isoformat(),
+                    'player_count': len(room_instance.players),
+                    'track_count': len(room_instance.tracks),
+                    'current_track_id': room_instance.current_track_id,
+                    'status': room_instance.status
+                })
+            return rooms_info
+    
+    async def close_room(self, room_name: str) -> bool:
+        """Cierra y elimina una sala"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            if room_name_clean in self.rooms:
+                del self.rooms[room_name_clean]
+                return True
+            return False
+    
+    async def get_room_info(self, room_name: str) -> Optional[Dict]:
+        """Obtiene información detallada de una sala"""
+        async with self._lock:
+            room_name_clean = room_name.strip().lower()
+            if room_name_clean not in self.rooms:
+                return None
+            
+            room_instance = self.rooms[room_name_clean]['room']
+            room_data = self.rooms[room_name_clean]
+            
+            return {
+                'name': room_name_clean,
+                'created_at': room_data.get('created_at', datetime.now()).isoformat(),
+                'players': {pid: p.model_dump() for pid, p in room_instance.players.items()},
+                'player_count': len(room_instance.players),
+                'tracks': [t.model_dump() for t in room_instance.tracks],
+                'track_count': len(room_instance.tracks),
+                'current_track_id': room_instance.current_track_id,
+                'status': room_instance.status,
+                'buzz_queue': room_instance.buzz_queue
+            }
 
 
 room_manager = RoomManager()
@@ -1651,6 +1722,117 @@ async def check_room(room_name: str):
     """Verifica si una sala existe (sin validar contraseña)"""
     exists = await room_manager.room_exists(room_name)
     return {"exists": exists, "room_name": room_name}
+
+
+def verify_admin_password(password: str) -> bool:
+    """Verifica la contraseña de administrador"""
+    if not ADMIN_PASSWORD_HASH:
+        return False
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8'))
+    except:
+        return False
+
+
+@app.post("/admin/auth")
+async def admin_auth(data: AdminAuthRequest):
+    """Autentica al administrador con contraseña"""
+    if verify_admin_password(data.password):
+        return {"authenticated": True, "message": "Autenticación exitosa"}
+    raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+
+class AdminPasswordRequest(BaseModel):
+    admin_password: str
+
+
+@app.post("/admin/rooms")
+async def admin_list_rooms(data: AdminPasswordRequest):
+    """Lista todas las salas activas (requiere contraseña de admin)"""
+    if not verify_admin_password(data.admin_password):
+        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
+    
+    rooms = await room_manager.list_rooms()
+    return {"rooms": rooms, "total": len(rooms)}
+
+
+@app.post("/admin/rooms/{room_name}")
+async def admin_get_room_info(room_name: str, data: AdminPasswordRequest):
+    """Obtiene información detallada de una sala (requiere contraseña de admin)"""
+    if not verify_admin_password(data.admin_password):
+        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
+    
+    room_info = await room_manager.get_room_info(room_name)
+    if not room_info:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    return room_info
+
+
+@app.post("/admin/rooms/close")
+async def admin_close_room(data: CloseRoomRequest):
+    """Cierra y elimina una sala (requiere contraseña de admin)"""
+    if not verify_admin_password(data.admin_password):
+        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
+    
+    room_instance = await room_manager.get_room(data.room_name)
+    if not room_instance:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    # Desconectar todos los WebSockets de esa sala
+    room_name_clean = data.room_name.strip().lower()
+    if room_name_clean in manager.rooms:
+        websockets_to_close = manager.rooms[room_name_clean].copy()
+        for ws in websockets_to_close:
+            try:
+                await ws.close()
+            except:
+                pass
+        del manager.rooms[room_name_clean]
+    
+    # Eliminar la sala
+    success = await room_manager.close_room(data.room_name)
+    if success:
+        return {"success": True, "message": f"Sala '{data.room_name}' cerrada exitosamente"}
+    raise HTTPException(status_code=404, detail="Sala no encontrada")
+
+
+@app.post("/admin/players/ban")
+async def admin_ban_player(data: BanPlayerRequest):
+    """Banea/expulsa a un jugador de una sala (requiere contraseña de admin)"""
+    if not verify_admin_password(data.admin_password):
+        raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
+    
+    room_instance = await room_manager.get_room(data.room_name)
+    if not room_instance:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    # Remover el jugador de la sala
+    player = room_instance.players.get(data.player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Jugador no encontrado en la sala")
+    
+    await room_instance.remove_player(data.player_id)
+    
+    # Desconectar el WebSocket del jugador
+    room_name_clean = data.room_name.strip().lower()
+    if room_name_clean in manager.rooms:
+        for ws in manager.rooms[room_name_clean]:
+            if manager.active.get(ws, {}).get("player_id") == data.player_id:
+                try:
+                    await ws.close()
+                except:
+                    pass
+                break
+    
+    # Notificar a los demás en la sala
+    await manager.broadcast(
+        {"type": "player_banned", "payload": {"playerId": data.player_id, "playerName": player.name}},
+        room_name_clean
+    )
+    await manager.broadcast(build_state_message(room_instance), room_name_clean)
+    
+    return {"success": True, "message": f"Jugador '{player.name}' expulsado de la sala"}
 
 
 @app.get("/")

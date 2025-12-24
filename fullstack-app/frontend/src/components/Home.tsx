@@ -269,6 +269,12 @@ export function Home({ onJoinRoom }: HomeProps) {
           </form>
         </div>
       )}
+
+      <div className="admin-link-container">
+        <a href="/admin" className="admin-link" title="Panel de Administrador">
+          ⚙️ Admin
+        </a>
+      </div>
     </div>
   );
 }
