@@ -1774,12 +1774,15 @@ async def admin_close_room(data: CloseRoomRequest):
     if not verify_admin_password(data.admin_password):
         raise HTTPException(status_code=401, detail="Contraseña de administrador incorrecta")
     
-    room_instance = await room_manager.get_room(data.room_name)
+    # Normalizar el nombre de la sala
+    room_name_clean = data.room_name.strip().lower()
+    
+    # Verificar que la sala existe
+    room_instance = await room_manager.get_room(room_name_clean)
     if not room_instance:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
     
     # Desconectar todos los WebSockets de esa sala
-    room_name_clean = data.room_name.strip().lower()
     if room_name_clean in manager.rooms:
         websockets_to_close = manager.rooms[room_name_clean].copy()
         for ws in websockets_to_close:
@@ -1789,8 +1792,8 @@ async def admin_close_room(data: CloseRoomRequest):
                 pass
         del manager.rooms[room_name_clean]
     
-    # Eliminar la sala
-    success = await room_manager.close_room(data.room_name)
+    # Eliminar la sala (usar el nombre normalizado)
+    success = await room_manager.close_room(room_name_clean)
     if success:
         return {"success": True, "message": f"Sala '{data.room_name}' cerrada exitosamente"}
     raise HTTPException(status_code=404, detail="Sala no encontrada")
