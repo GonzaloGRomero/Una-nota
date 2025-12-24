@@ -986,9 +986,8 @@ def import_youtube_playlist(playlist_url: str) -> tuple[List[Track], str, int]:
         cookies_path = get_youtube_cookies_path()
         if cookies_path:
             ydl_opts['cookiefile'] = cookies_path
-        else:
         
-            full_url = f"https://www.youtube.com/playlist?list={playlist_id}"
+        full_url = f"https://www.youtube.com/playlist?list={playlist_id}"
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
@@ -999,11 +998,19 @@ def import_youtube_playlist(playlist_url: str) -> tuple[List[Track], str, int]:
                 import re
                 error_msg = re.sub(r'\x1b\[[0-9;]*m', '', error_msg)
                 
+                # Detectar diferentes tipos de errores
                 if "Sign in to confirm" in error_msg or "bot" in error_msg.lower() or "Sign in" in error_msg:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"YouTube está bloqueando las solicitudes automáticas (detección de bot). Soluciones: 1) Espera 10-15 minutos y vuelve a intentar, 2) Usa una playlist de Spotify en su lugar (más confiable), 3) La playlist puede ser privada o tener restricciones. Nota: YouTube puede bloquear solicitudes automáticas incluso con configuración optimizada."
+                        detail=f"YouTube está bloqueando las solicitudes automáticas (detección de bot). Soluciones: 1) Inicia sesión con YouTube Music (botón 'Conectar cuenta de YouTube') para usar la API oficial, 2) Espera 10-15 minutos y vuelve a intentar, 3) Usa una playlist de Spotify en su lugar (más confiable)."
                     )
+                
+                if "JSONDecodeError" in error_msg or "Failed to parse JSON" in error_msg or "Expecting value" in error_msg:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"YouTube está bloqueando el acceso a esta playlist. Soluciones: 1) Inicia sesión con YouTube Music (botón 'Conectar cuenta de YouTube') para usar la API oficial, 2) Verifica que la playlist sea pública, 3) Usa una playlist de Spotify en su lugar (más confiable). Error técnico: {error_msg[:200]}"
+                    )
+                
                 raise HTTPException(
                     status_code=500,
                     detail=f"Error accediendo a la playlist de YouTube: {error_msg[:300]}"
@@ -1181,12 +1188,32 @@ async def import_playlist(playlist_data: PlaylistImport):
         # Importar desde YouTube Music
         if source == "youtube":
             try:
-                tracks, playlist_name, tracks_without_url = import_youtube_playlist(playlist_url)
+                # Intentar primero con API autenticada si está disponible
+                youtube_service = get_youtube_service()
+                if youtube_service:
+                    try:
+                        playlist_id = extract_youtube_playlist_id(playlist_url)
+                        if playlist_id:
+                            tracks_list, playlist_name = import_youtube_playlist_authenticated(playlist_id)
+                            # Convertir a formato Track y agregar URLs vacías (se cargarán bajo demanda)
+                            tracks = tracks_list
+                            tracks_without_url = 0
+                        else:
+                            raise HTTPException(status_code=400, detail="ID de playlist de YouTube inválido")
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        # Si falla la API autenticada, intentar con yt-dlp como fallback
+                        print(f"Error con API autenticada, usando yt-dlp como fallback: {str(e)}")
+                        tracks, playlist_name, tracks_without_url = import_youtube_playlist(playlist_url)
+                else:
+                    # Sin autenticación, usar yt-dlp (puede fallar por bloqueos de YouTube)
+                    tracks, playlist_name, tracks_without_url = import_youtube_playlist(playlist_url)
                 
                 if not tracks:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"No se pudieron obtener canciones de la playlist de YouTube. Verifica que la playlist sea pública y tenga videos disponibles."
+                        detail=f"No se pudieron obtener canciones de la playlist de YouTube. Verifica que la playlist sea pública y tenga videos disponibles. Si el problema persiste, intenta iniciar sesión con YouTube Music usando el botón 'Conectar cuenta de YouTube'."
                     )
                 
                 await target_room.update_tracks(tracks)
@@ -1467,7 +1494,7 @@ def get_youtube_service():
             return build('youtube', 'v3', credentials=credentials)
         else:
             try:
-                credentials.refresh(Request())
+                credentials.refresh(GoogleRequest())
                 save_youtube_tokens()  # Guardar tokens refrescados
                 return build('youtube', 'v3', credentials=credentials)
             except:
