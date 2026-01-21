@@ -9,7 +9,7 @@ El error "Error 400: invalid_request" generalmente ocurre porque `GOOGLE_REDIREC
 1. Ve a Railway → Tu proyecto → Backend service → **Variables**
 2. Agrega/verifica esta variable:
    ```
-   GOOGLE_REDIRECT_URI = https://juego-en-una-nota-production.up.railway.app/auth/youtube/callback
+   GOOGLE_REDIRECT_URI = https://juego-en-una-nota-production-0f49.up.railway.app/auth/youtube/callback
    ```
    **IMPORTANTE**: 
    - Debe ser la URL completa de tu backend
@@ -26,7 +26,7 @@ El error "Error 400: invalid_request" generalmente ocurre porque `GOOGLE_REDIREC
 4. Click en tu **OAuth 2.0 Client ID**
 5. En **Authorized redirect URIs**, verifica que esté:
    ```
-   https://juego-en-una-nota-production.up.railway.app/auth/youtube/callback
+   https://juego-en-una-nota-production-0f49.up.railway.app/auth/youtube/callback
    ```
 6. Si NO está, agrégala y guarda
 
@@ -53,3 +53,5 @@ Después de configurar:
 - No puede tener espacios al inicio o final
 - Debe usar `https://` (Railway usa HTTPS)
 - La ruta debe ser exactamente `/auth/youtube/callback`
+
+
